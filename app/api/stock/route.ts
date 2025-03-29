@@ -11,34 +11,35 @@ export async function GET() {
     );
     client.release();
 
-    const cantidad = Number(res.rows[0]?.cantidad) || 0;
-    const precio = parseFloat(res.rows[0]?.precio) || 0;
-
-    return NextResponse.json({ cantidad, precio }, { status: 200 });
+    return NextResponse.json({
+      cantidad: Number(res.rows[0]?.cantidad) || 0,
+      precio: parseFloat(res.rows[0]?.precio) || 0
+    });
   } catch (error) {
-    return NextResponse.json({ 
-      error: 'Error al obtener el stock' 
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Error al obtener el stock' },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: Request) {
-  const { cantidad } = await request.json();
-
   try {
+    const { cantidad } = await request.json();
     const client = await pool.connect();
+    
     await client.query(
       'UPDATE stock SET cantidad = cantidad + $1 WHERE producto = $2', 
       [cantidad, 'pollo']
     );
+    
     client.release();
-
-    return NextResponse.json({ 
-      message: 'Stock actualizado' 
-    }, { status: 200 });
+    return NextResponse.json({ message: 'Stock actualizado' });
+    
   } catch (error) {
-    return NextResponse.json({ 
-      error: 'Error al actualizar el stock' 
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Error al actualizar el stock' },
+      { status: 500 }
+    );
   }
 }
