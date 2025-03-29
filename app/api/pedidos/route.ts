@@ -141,20 +141,36 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = searchParams.get('limit') || '100';
+    const ultimo = searchParams.get('ultimo');
 
     const client = await pool.connect();
-    const result = await client.query(
-      `SELECT * FROM pedidos 
-       ORDER BY fecha_pedido DESC, numero_pedido DESC 
-       LIMIT $1`,
-      [limit]
-    );
-    client.release();
-
-    return NextResponse.json({
-      success: true,
-      data: result.rows
-    });
+    
+    if (ultimo === 'true') {
+      // Lógica para obtener solo el último pedido
+      const result = await client.query(
+        `SELECT numero_pedido FROM pedidos 
+         ORDER BY fecha_pedido DESC, numero_pedido DESC 
+         LIMIT 1`
+      );
+      client.release();
+      return NextResponse.json({
+        success: true,
+        numeroPedido: result.rows[0]?.numero_pedido || null
+      });
+    } else {
+      // Lógica original para listado de pedidos
+      const result = await client.query(
+        `SELECT * FROM pedidos 
+         ORDER BY fecha_pedido DESC, numero_pedido DESC 
+         LIMIT $1`,
+        [limit]
+      );
+      client.release();
+      return NextResponse.json({
+        success: true,
+        data: result.rows
+      });
+    }
     
   } catch (error) {
     console.error('Error en GET /api/pedidos:', error);
