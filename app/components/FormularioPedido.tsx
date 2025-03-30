@@ -1,16 +1,21 @@
 "use client";
 import { useState, useEffect } from 'react';
 
+// Función para formatear números con puntos de miles
+const formatNumber = (num: number) => {
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
 const TablaStock = ({ stock, precio }: { stock: number; precio: number }) => {
   return (
     <div className="grid grid-cols-2 gap-4 mb-4">
       <div>
         <p className="text-gray-600">Stock disponible:</p>
-        <p className="font-bold">{stock} unidades</p>
+        <p className="font-bold">{formatNumber(stock)} unidades</p>
       </div>
       <div>
         <p className="text-gray-600">Precio unitario:</p>
-        <p className="font-bold text-green-600">${precio.toFixed(2)}</p>
+        <p className="font-bold text-green-600">${formatNumber(precio)}</p>
       </div>
     </div>
   );
@@ -32,10 +37,10 @@ export default function FormularioPedido() {
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'debito' | 'credito' | 'transferencia'>('efectivo');
   const [conChimichurri, setConChimichurri] = useState<boolean>(false);
   const [cantidadPollo, setCantidadPollo] = useState<number>(0);
-  const [precioUnitario, setPrecioUnitario] = useState<number>(0);
+  const [precioUnitario, setPrecioUnitario] = useState<number>(20000);
   const [precioFinal, setPrecioFinal] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [stockData, setStockData] = useState<StockData>({ cantidad: 0, precio: 0 });
+  const [stockData, setStockData] = useState<StockData>({ cantidad: 0, precio: 20000 });
   const [lastResetDate, setLastResetDate] = useState<string>('');
 
   // Obtener stock al cargar
@@ -46,10 +51,10 @@ export default function FormularioPedido() {
 
   // Calcular precio automáticamente
   useEffect(() => {
-    if (cantidadPollo > 0 && precioUnitario > 0) {
+    if (cantidadPollo > 0) {
       calcularPrecio();
     }
-  }, [cantidadPollo, precioUnitario, tipoEntrega, tipoEnvio]);
+  }, [cantidadPollo, tipoEntrega, tipoEnvio]);
 
   const calcularPrecio = () => {
     let total = cantidadPollo * precioUnitario;
@@ -57,13 +62,15 @@ export default function FormularioPedido() {
     // Aplicar costo de envío si corresponde
     if (tipoEntrega === 'envio') {
       switch(tipoEnvio) {
+        case 'cercano':
+          total += 1500;
+          break;
         case 'lejano':
-          total += 500; // Costo adicional por envío lejano
+          total += 2500;
           break;
         case 'la_banda':
-          total += 800; // Costo adicional por envío a La Banda
+          total += 3000;
           break;
-        // 'cercano' y 'gratis' no agregan costo
       }
     }
 
@@ -76,7 +83,7 @@ export default function FormularioPedido() {
       if (res.ok) {
         const data: StockData = await res.json();
         setStockData(data);
-        setPrecioUnitario(data.precio);
+        setPrecioUnitario(20000);
       }
     } catch (error) {
       console.error('Error obteniendo stock:', error);
@@ -88,13 +95,11 @@ export default function FormularioPedido() {
     const storedDate = localStorage.getItem('lastResetDate');
     const storedSequence = localStorage.getItem('currentSequence') || '0';
 
-    // Si es un nuevo día o no hay fecha almacenada
     if (storedDate !== today || !storedDate) {
       localStorage.setItem('lastResetDate', today);
       localStorage.setItem('currentSequence', '1');
       generateDisplayNumber(1);
     } else {
-      // Mismo día, continuar la secuencia
       const currentSequence = parseInt(storedSequence);
       generateDisplayNumber(currentSequence);
     }
@@ -107,11 +112,10 @@ export default function FormularioPedido() {
     setNumeroPedido(numeroMostrar);
   };
 
-  // Función para formatear el número de pedido para mostrar
   const formatNumeroParaMostrar = (numero: string) => {
     if (numero.includes('-')) {
       const parts = numero.split('-');
-      if (parts.length === 4) { // Formato YYYY-MM-DD-SSS
+      if (parts.length === 4) {
         return `${parts[2]}/${parts[1]}-${parts[3]}`;
       }
       return numero;
@@ -122,7 +126,6 @@ export default function FormularioPedido() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validaciones
     if (!nombre.trim()) {
       alert('Ingrese el nombre del cliente');
       return;
@@ -134,7 +137,7 @@ export default function FormularioPedido() {
     }
   
     if (cantidadPollo > stockData.cantidad) {
-      alert(`Stock insuficiente. Disponible: ${stockData.cantidad}`);
+      alert(`Stock insuficiente. Disponible: ${formatNumber(stockData.cantidad)}`);
       return;
     }
   
@@ -171,19 +174,17 @@ export default function FormularioPedido() {
         throw new Error(result.error || 'Error al registrar pedido');
       }
 
-      // Incrementar la secuencia local solo si el pedido fue exitoso
       const currentSequence = parseInt(localStorage.getItem('currentSequence') || '0');
       localStorage.setItem('currentSequence', (currentSequence + 1).toString());
       
       alert('Pedido registrado con éxito');
-      // Resetear formulario
       setNombre('');
       setTelefono('');
       setCantidadPollo(0);
       setConChimichurri(false);
       setTipoEntrega('retira');
       obtenerStock();
-      checkAndResetSequence(); // Generar nuevo número para el próximo pedido
+      checkAndResetSequence();
   
     } catch (error) {
       console.error('Error:', error);
@@ -202,7 +203,7 @@ export default function FormularioPedido() {
     <div className="max-w-md mx-auto p-4">
       <div className="bg-white p-4 mb-6 rounded-lg shadow">
         <h2 className="text-xl font-bold mb-2">Stock Disponible</h2>
-        <TablaStock stock={stockData.cantidad} precio={stockData.precio} />
+        <TablaStock stock={stockData.cantidad} precio={20000} />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-lg shadow">
@@ -277,7 +278,7 @@ export default function FormularioPedido() {
                       checked={tipoEnvio === 'cercano'}
                       onChange={() => setTipoEnvio('cercano')}
                     />
-                    <span>Cercano (+$0)</span>
+                    <span>Cercano (+${formatNumber(1500)})</span>
                   </label>
                   <label className="flex items-center space-x-2 p-2 border rounded">
                     <input
@@ -285,7 +286,7 @@ export default function FormularioPedido() {
                       checked={tipoEnvio === 'lejano'}
                       onChange={() => setTipoEnvio('lejano')}
                     />
-                    <span>Lejano (+$500)</span>
+                    <span>Lejano (+${formatNumber(2500)})</span>
                   </label>
                   <label className="flex items-center space-x-2 p-2 border rounded">
                     <input
@@ -293,7 +294,7 @@ export default function FormularioPedido() {
                       checked={tipoEnvio === 'la_banda'}
                       onChange={() => setTipoEnvio('la_banda')}
                     />
-                    <span>La Banda (+$800)</span>
+                    <span>La Banda (+${formatNumber(3000)})</span>
                   </label>
                   <label className="flex items-center space-x-2 p-2 border rounded">
                     <input
@@ -361,31 +362,18 @@ export default function FormularioPedido() {
             />
           </div>
 
-          <div>
-            <label className="block text-gray-700 mb-1">Precio unitario*</label>
-            <input
-              type="number"
-              value={precioUnitario || ''}
-              onChange={(e) => handleNumberChange(e, setPrecioUnitario)}
-              className="w-full p-2 border rounded"
-              step="0.01"
-              min="0"
-              required
-            />
-          </div>
-
           <div className="bg-blue-50 p-3 rounded-lg">
             <div className="flex justify-between font-bold">
               <span>Total a pagar:</span>
               <span className="text-lg text-blue-600">
-                ${precioFinal.toFixed(2)}
+                ${formatNumber(precioFinal)}
               </span>
             </div>
             {tipoEntrega === 'envio' && (
               <div className="text-sm text-gray-600 mt-1">
-                {tipoEnvio === 'cercano' && 'Incluye envío cercano sin costo'}
-                {tipoEnvio === 'lejano' && 'Incluye costo de envío lejano: $500'}
-                {tipoEnvio === 'la_banda' && 'Incluye costo de envío a La Banda: $800'}
+                {tipoEnvio === 'cercano' && `Incluye envío cercano: $${formatNumber(1500)}`}
+                {tipoEnvio === 'lejano' && `Incluye costo de envío lejano: $${formatNumber(2500)}`}
+                {tipoEnvio === 'la_banda' && `Incluye costo de envío a La Banda: $${formatNumber(3000)}`}
                 {tipoEnvio === 'gratis' && 'Incluye envío gratis'}
               </div>
             )}
