@@ -5,23 +5,18 @@ interface Pedido {
   id: number;
   numero_pedido: string;
   nombre_cliente: string;
-  fecha: string;
-  hora_pedido: string;
-  cantidad_pollo: number;
-  precio_unitario: number;
-  precio_total: number;
-  tipo_entrega: string;
-  tipo_envio: string | null;
+  telefono_cliente?: string;
+  tipo_entrega: 'retira' | 'envio';
+  tipo_envio: 'cercano' | 'lejano' | 'la_banda' | 'gratis' | null;
+  direccion?: string;
   metodo_pago: string;
   con_chimichurri: boolean;
-  direccion?: string;
-  telefono_cliente?: string;
-}
-
-interface ApiResponse {
-  success: boolean;
-  data?: Pedido[];
-  error?: string;
+  cantidad_pollo: number;
+  precio_unitario: number;
+  precio_total: number | string; // Aceptamos ambos tipos
+  fecha: string;
+  hora_pedido: string;
+  fecha_pedido: string;
 }
 
 export default function HistorialPedidos() {
@@ -35,18 +30,25 @@ export default function HistorialPedidos() {
         const response = await fetch('/api/pedidos?limit=100');
         const data = await response.json();
         
-        console.log('Datos recibidos:', data.data); // Para diagnóstico
-        
         if (!response.ok || !data.success) {
           throw new Error(data.error || `HTTP error! status: ${response.status}`);
         }
+
+        // Convertir precios a número si vienen como string
+        const pedidosFormateados = data.data.map((pedido: Pedido) => ({
+          ...pedido,
+          precio_total: typeof pedido.precio_total === 'string' 
+            ? parseFloat(pedido.precio_total) 
+            : pedido.precio_total,
+          precio_unitario: typeof pedido.precio_unitario === 'string' 
+            ? parseFloat(pedido.precio_unitario) 
+            : pedido.precio_unitario
+        }));
         
-        setPedidos(data.data || []);
+        setPedidos(pedidosFormateados || []);
       } catch (err) {
-        let errorMessage = 'Error desconocido';
-        if (err instanceof Error) errorMessage = err.message;
-        setError(errorMessage);
-        console.error('Error fetching pedidos:', errorMessage);
+        setError(err instanceof Error ? err.message : 'Error desconocido');
+        console.error('Error fetching pedidos:', err);
       } finally {
         setIsLoading(false);
       }
@@ -55,116 +57,89 @@ export default function HistorialPedidos() {
     fetchPedidos();
   }, []);
 
+  const formatMetodoPago = (metodo: string) => {
+    const metodos: Record<string, string> = {
+      efectivo: 'Efectivo',
+      debito: 'Débito',
+      credito: 'Crédito',
+      transferencia: 'Transferencia'
+    };
+    return metodos[metodo] || metodo;
+  };
+
+  const formatTipoEnvio = (tipo: string | null) => {
+    if (!tipo) return '';
+    const tipos: Record<string, string> = {
+      cercano: 'Cercano',
+      lejano: 'Lejano (+$500)',
+      la_banda: 'La Banda (+$800)',
+      gratis: 'Gratis'
+    };
+    return tipos[tipo] || tipo;
+  };
+
   const formatNumeroPedido = (numero: string) => {
     const parts = numero.split('-');
     if (parts.length === 4) {
-      const [year, month, day, seq] = parts;
-      return `${day}/${month}-${seq}`;
+      return `${parts[2]}/${parts[1]}-${parts[3]}`;
     }
     return numero;
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
+  const formatPrecio = (precio: number | string) => {
+    const numero = typeof precio === 'string' ? parseFloat(precio) : precio;
+    return isNaN(numero) ? '$0.00' : `$${numero.toFixed(2)}`;
   };
 
-  const formatTime = (timeValue: any) => {
-    if (!timeValue) return '-';
-    
-    // Si es un string con formato de hora (HH:MM:SS o HH:MM)
-    if (typeof timeValue === 'string') {
-      // Extraer solo la parte de la hora (HH:MM)
-      const timeMatch = timeValue.match(/(\d{2}):(\d{2})(?::\d{2})?/);
-      if (timeMatch) {
-        return `${timeMatch[1]}:${timeMatch[2]}`;
-      }
-    }
-    
-    // Si es un timestamp ISO
-    try {
-      const date = new Date(timeValue);
-      if (!isNaN(date.getTime())) {
-        return date.toLocaleTimeString('es-AR', {
-          timeZone: 'America/Argentina/Tucuman',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        });
-      }
-    } catch {
-      console.warn('No se pudo formatear la hora:', timeValue);
-    }
-    
-    return '-';
-  };
-
-  const getTipoEnvioText = (tipo: string | null) => {
-    if (!tipo) return '';
-    switch(tipo) {
-      case 'cercano': return 'Cercano';
-      case 'lejano': return 'Lejano (+$500)';
-      case 'la_banda': return 'La Banda (+$800)';
-      case 'gratis': return 'Gratis';
-      default: return tipo;
-    }
-  };
-
-  if (isLoading) return <div className="p-4 text-center">Cargando historial...</div>;
+  if (isLoading) return <div className="p-4 text-center">Cargando...</div>;
   if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
 
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6">Historial de Pedidos</h1>
       
-      {pedidos.length === 0 ? (
-        <p className="text-center py-8">No hay pedidos registrados</p>
-      ) : (
-        <div className="overflow-x-auto bg-white rounded-lg shadow">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left">N° Pedido</th>
-                <th className="px-6 py-3 text-left">Cliente</th>
-                <th className="px-6 py-3 text-left">Teléfono</th>
-                <th className="px-6 py-3 text-left">Fecha</th>
-                <th className="px-6 py-3 text-left">Hora</th>
-                <th className="px-6 py-3 text-left">Tipo</th>
-                <th className="px-6 py-3 text-left">Cantidad</th>
-                <th className="px-6 py-3 text-left">Total</th>
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white rounded-lg overflow-hidden">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-4 py-2">N° Pedido</th>
+              <th className="px-4 py-2">Cliente</th>
+              <th className="px-4 py-2">Teléfono</th>
+              <th className="px-4 py-2">Entrega</th>
+              <th className="px-4 py-2">Dirección</th>
+              <th className="px-4 py-2">Pago</th>
+              <th className="px-4 py-2">Chimi</th>
+              <th className="px-4 py-2">Cantidad</th>
+              <th className="px-4 py-2">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pedidos.map((pedido) => (
+              <tr key={pedido.id} className="border-b hover:bg-gray-50">
+                <td className="px-4 py-3">{formatNumeroPedido(pedido.numero_pedido)}</td>
+                <td className="px-4 py-3">{pedido.nombre_cliente}</td>
+                <td className="px-4 py-3">{pedido.telefono_cliente || '-'}</td>
+                <td className="px-4 py-3">
+                  {pedido.tipo_entrega === 'envio' ? 
+                    `Envío (${formatTipoEnvio(pedido.tipo_envio)})` : 
+                    'Retira'}
+                </td>
+                <td className="px-4 py-3">
+                  {pedido.tipo_entrega === 'envio' ? pedido.direccion : '-'}
+                </td>
+                <td className="px-4 py-3">{formatMetodoPago(pedido.metodo_pago)}</td>
+                <td className="px-4 py-3 text-center">
+                  {pedido.con_chimichurri ? '✅' : '❌'}
+                </td>
+                <td className="px-4 py-3">{pedido.cantidad_pollo}</td>
+                <td className="px-4 py-3 font-semibold">
+                  {formatPrecio(pedido.precio_total)}
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {pedidos.map((pedido) => (
-                <tr key={pedido.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {formatNumeroPedido(pedido.numero_pedido)}
-                  </td>
-                  <td className="px-6 py-4">{pedido.nombre_cliente}</td>
-                  <td className="px-6 py-4">{pedido.telefono_cliente || '-'}</td>
-                  <td className="px-6 py-4">{formatDate(pedido.fecha)}</td>
-                  <td className="px-6 py-4">
-                    {formatTime(pedido.hora_pedido)}
-                  </td>
-                  <td className="px-6 py-4">
-                    {pedido.tipo_entrega === 'envio'
-                      ? `Envío (${getTipoEnvioText(pedido.tipo_envio)})`
-                      : 'Retira'}
-                  </td>
-                  <td className="px-6 py-4">{pedido.cantidad_pollo}</td>
-                  <td className="px-6 py-4 font-semibold">
-                    ${Number(pedido.precio_total).toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
