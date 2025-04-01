@@ -11,9 +11,11 @@ interface Pedido {
   direccion?: string;
   metodo_pago: string;
   con_chimichurri: boolean;
+  con_papas: boolean;
+  cantidad_papas: number;
   cantidad_pollo: number;
   precio_unitario: number;
-  precio_total: number | string; // Aceptamos ambos tipos
+  precio_total: number | string;
   fecha: string;
   hora_pedido: string;
   fecha_pedido: string;
@@ -34,7 +36,6 @@ export default function HistorialPedidos() {
           throw new Error(data.error || `HTTP error! status: ${response.status}`);
         }
 
-        // Convertir precios a número si vienen como string
         const pedidosFormateados = data.data.map((pedido: Pedido) => ({
           ...pedido,
           precio_total: typeof pedido.precio_total === 'string' 
@@ -106,10 +107,10 @@ export default function HistorialPedidos() {
               <th className="px-4 py-2">Cliente</th>
               <th className="px-4 py-2">Teléfono</th>
               <th className="px-4 py-2">Entrega</th>
-              <th className="px-4 py-2">Dirección</th>
               <th className="px-4 py-2">Pago</th>
               <th className="px-4 py-2">Chimi</th>
-              <th className="px-4 py-2">Cantidad</th>
+              <th className="px-4 py-2">Papas</th>
+              <th className="px-4 py-2">Cant. Pollo</th>
               <th className="px-4 py-2">Total</th>
             </tr>
           </thead>
@@ -124,12 +125,12 @@ export default function HistorialPedidos() {
                     `Envío (${formatTipoEnvio(pedido.tipo_envio)})` : 
                     'Retira'}
                 </td>
-                <td className="px-4 py-3">
-                  {pedido.tipo_entrega === 'envio' ? pedido.direccion : '-'}
-                </td>
                 <td className="px-4 py-3">{formatMetodoPago(pedido.metodo_pago)}</td>
                 <td className="px-4 py-3 text-center">
                   {pedido.con_chimichurri ? '✅' : '❌'}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {pedido.con_papas ? `${pedido.cantidad_papas} 🍟` : '❌'}
                 </td>
                 <td className="px-4 py-3">{pedido.cantidad_pollo}</td>
                 <td className="px-4 py-3 font-semibold">

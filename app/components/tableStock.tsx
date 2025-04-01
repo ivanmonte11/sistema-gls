@@ -3,7 +3,12 @@ interface TablaStockProps {
   precio?: number; // Hacerlo opcional
 }
 
-export default function TablaStock({ stock, precio }: TablaStockProps) {
+export default function TablaStock({ stock, precio = 20000 }: TablaStockProps) {
+  // Función para formatear números con puntos de miles
+  const formatNumber = (num: number) => {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h2 className="text-xl font-semibold text-gray-800 mb-4">Stock Disponible</h2>
@@ -19,10 +24,10 @@ export default function TablaStock({ stock, precio }: TablaStockProps) {
           <tbody>
             <tr className="border-b hover:bg-gray-50 transition-colors">
               <td className="p-3 text-gray-600">Pollo</td>
-              <td className="p-3 text-gray-800 font-medium">{stock}</td>
+              <td className="p-3 text-gray-800 font-medium">{formatNumber(stock)}</td>
               <td className="p-3 text-gray-800 font-medium">
                 {typeof precio === 'number' ? (
-                  <span className="text-green-600">${precio.toFixed(2)}</span>
+                  <span className="text-green-600">${formatNumber(precio)}</span>
                 ) : (
                   <span className="text-gray-400">N/A</span>
                 )}

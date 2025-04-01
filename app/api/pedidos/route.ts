@@ -4,24 +4,18 @@ import pool from '@/lib/db';
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
 
 async function generarNumeroPedido(client: any): Promise<string> {
-  // 1. Obtener fecha actual en zona horaria Argentina (manera confiable)
   const ahora = new Date();
   const opciones = { timeZone: 'America/Argentina/Buenos_Aires' };
   
-  // Formatear fecha como DD-MM-YYYY
   const dia = ahora.toLocaleDateString('es-AR', { ...opciones, day: '2-digit' });
   const mes = ahora.toLocaleDateString('es-AR', { ...opciones, month: '2-digit' });
   const año = ahora.toLocaleDateString('es-AR', { ...opciones, year: 'numeric' });
   const hoyFormatoLocal = `${dia}-${mes}-${año}`;
-  
-  // Para la fecha en formato YYYY-MM-DD (hoyStr)
   const hoyStr = `${año}-${mes}-${dia}`;
 
-  // 2. Iniciar transacción
   await client.query('BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE');
 
   try {
-    // 3. Buscar último número del día
     const res = await client.query(
       `SELECT numero_pedido FROM pedidos 
        WHERE fecha_pedido = $1 
@@ -46,7 +40,6 @@ async function generarNumeroPedido(client: any): Promise<string> {
 
     const numeroPedido = `P-${hoyFormatoLocal}-${siguienteNumero.toString().padStart(3, '0')}`;
 
-    // 4. Verificar unicidad
     const existe = await client.query(
       `SELECT 1 FROM pedidos WHERE numero_pedido = $1 LIMIT 1`,
       [numeroPedido]
@@ -83,6 +76,8 @@ export async function GET(request: Request) {
           direccion,
           metodo_pago,
           con_chimichurri,
+          con_papas,
+          cantidad_papas,
           cantidad_pollo,
           precio_unitario,
           precio_total,
@@ -111,6 +106,8 @@ export async function GET(request: Request) {
         direccion,
         metodo_pago,
         con_chimichurri,
+        con_papas,
+        cantidad_papas,
         cantidad_pollo,
         precio_unitario,
         precio_total,
@@ -145,7 +142,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   let client;
   try {
-    // Validación de Content-Type
     if (!request.headers.get('content-type')?.includes('application/json')) {
       return NextResponse.json(
         { success: false, error: 'Content-Type debe ser application/json' },
@@ -155,7 +151,6 @@ export async function POST(request: Request) {
 
     const data = await request.json();
     
-    // Validación de campos obligatorios
     const requiredFields = [
       'nombre', 'tipoEntrega', 'metodoPago', 
       'cantidadPollo', 'precioUnitario', 'precioTotal'
@@ -174,14 +169,9 @@ export async function POST(request: Request) {
     }
 
     client = await pool.connect();
-    
-    // Generar número de pedido con protección contra concurrencia
     const numeroPedido = await generarNumeroPedido(client);
-    
-    // Iniciar transacción para el pedido completo
     await client.query('BEGIN');
     
-    // Insertar nuevo pedido
     const result = await client.query(
       `INSERT INTO pedidos (
         numero_pedido,
@@ -192,6 +182,8 @@ export async function POST(request: Request) {
         direccion,
         metodo_pago,
         con_chimichurri,
+        con_papas,
+        cantidad_papas,
         cantidad_pollo,
         precio_unitario,
         precio_total,
@@ -199,10 +191,10 @@ export async function POST(request: Request) {
         hora_pedido,
         fecha_pedido
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-        NOW() AT TIME ZONE $12,
-        (NOW() AT TIME ZONE $12)::time,
-        (NOW() AT TIME ZONE $12)::date
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+        NOW() AT TIME ZONE $14,
+        (NOW() AT TIME ZONE $14)::time,
+        (NOW() AT TIME ZONE $14)::date
       ) RETURNING id, numero_pedido`,
       [
         numeroPedido,
@@ -213,6 +205,8 @@ export async function POST(request: Request) {
         data.tipoEntrega === 'envio' ? data.direccion : null,
         data.metodoPago,
         data.conChimichurri || false,
+        data.conPapas || false,
+        data.conPapas ? (data.cantidadPapas || 0) : 0,
         data.cantidadPollo,
         Number(data.precioUnitario),
         Number(data.precioTotal),
@@ -220,7 +214,6 @@ export async function POST(request: Request) {
       ]
     );
 
-    // Actualizar stock
     await client.query(
       'UPDATE stock SET cantidad = cantidad - $1 WHERE producto = $2',
       [data.cantidadPollo, 'pollo']
@@ -237,7 +230,6 @@ export async function POST(request: Request) {
     });
     
   } catch (error) {
-    // Manejo seguro de errores
     if (client) {
       await client.query('ROLLBACK').catch(e => console.error('Error en ROLLBACK:', e));
       client.release();

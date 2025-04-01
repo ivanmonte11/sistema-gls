@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
 
-// Función para formatear números con puntos de miles
 const formatNumber = (num: number) => {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 };
@@ -36,6 +35,8 @@ export default function FormularioPedido() {
   const [direccion, setDireccion] = useState<string>('');
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'debito' | 'credito' | 'transferencia'>('efectivo');
   const [conChimichurri, setConChimichurri] = useState<boolean>(false);
+  const [conPapas, setConPapas] = useState<boolean>(false);
+  const [cantidadPapas, setCantidadPapas] = useState<number>(0);
   const [cantidadPollo, setCantidadPollo] = useState<number>(0);
   const [precioUnitario, setPrecioUnitario] = useState<number>(20000);
   const [precioFinal, setPrecioFinal] = useState<number>(0);
@@ -43,35 +44,32 @@ export default function FormularioPedido() {
   const [stockData, setStockData] = useState<StockData>({ cantidad: 0, precio: 20000 });
   const [lastResetDate, setLastResetDate] = useState<string>('');
 
-  // Obtener stock al cargar
   useEffect(() => {
     obtenerStock();
     checkAndResetSequence();
   }, []);
 
-  // Calcular precio automáticamente
   useEffect(() => {
     if (cantidadPollo > 0) {
       calcularPrecio();
     }
-  }, [cantidadPollo, tipoEntrega, tipoEnvio]);
+  }, [cantidadPollo, tipoEntrega, tipoEnvio, conPapas, cantidadPapas]);
 
   const calcularPrecio = () => {
     let total = cantidadPollo * precioUnitario;
     
-    // Aplicar costo de envío si corresponde
+    // Costo de envío
     if (tipoEntrega === 'envio') {
       switch(tipoEnvio) {
-        case 'cercano':
-          total += 1500;
-          break;
-        case 'lejano':
-          total += 2500;
-          break;
-        case 'la_banda':
-          total += 3000;
-          break;
+        case 'cercano': total += 1500; break;
+        case 'lejano': total += 2500; break;
+        case 'la_banda': total += 3000; break;
       }
+    }
+
+    // Costo de papas (ejemplo: $500 por porción)
+    if (conPapas && cantidadPapas > 0) {
+      total += cantidadPapas * 500;
     }
 
     setPrecioFinal(total);
@@ -162,6 +160,8 @@ export default function FormularioPedido() {
           direccion: tipoEntrega === 'envio' ? direccion : null,
           metodoPago,
           conChimichurri,
+          conPapas,
+          cantidadPapas,
           cantidadPollo,
           precioUnitario,
           precioTotal: precioFinal
@@ -182,6 +182,8 @@ export default function FormularioPedido() {
       setTelefono('');
       setCantidadPollo(0);
       setConChimichurri(false);
+      setConPapas(false);
+      setCantidadPapas(0);
       setTipoEntrega('retira');
       obtenerStock();
       checkAndResetSequence();
@@ -336,16 +338,44 @@ export default function FormularioPedido() {
           </select>
         </div>
 
-        {/* Chimichurri */}
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            checked={conChimichurri}
-            onChange={(e) => setConChimichurri(e.target.checked)}
-            className="mr-2"
-            id="chimichurri"
-          />
-          <label htmlFor="chimichurri">Incluir chimichurri</label>
+        {/* Chimichurri y Papas */}
+        <div className="space-y-3">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={conChimichurri}
+              onChange={(e) => setConChimichurri(e.target.checked)}
+              className="mr-2"
+              id="chimichurri"
+            />
+            <label htmlFor="chimichurri">Incluir chimichurri</label>
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={conPapas}
+              onChange={(e) => {
+                setConPapas(e.target.checked);
+                if (!e.target.checked) setCantidadPapas(0);
+              }}
+              className="mr-2"
+              id="papas"
+            />
+            <label htmlFor="papas" className="mr-2">Incluir porción de papas</label>
+            
+            {conPapas && (
+              <select
+                value={cantidadPapas}
+                onChange={(e) => setCantidadPapas(Number(e.target.value))}
+                className="p-1 border rounded"
+              >
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            )}
+          </div>
         </div>
 
         {/* Cantidad y precios */}
@@ -375,6 +405,11 @@ export default function FormularioPedido() {
                 {tipoEnvio === 'lejano' && `Incluye costo de envío lejano: $${formatNumber(2500)}`}
                 {tipoEnvio === 'la_banda' && `Incluye costo de envío a La Banda: $${formatNumber(3000)}`}
                 {tipoEnvio === 'gratis' && 'Incluye envío gratis'}
+              </div>
+            )}
+            {conPapas && cantidadPapas > 0 && (
+              <div className="text-sm text-gray-600 mt-1">
+                {cantidadPapas} porción(es) de papas: +${formatNumber(cantidadPapas * 500)}
               </div>
             )}
           </div>
