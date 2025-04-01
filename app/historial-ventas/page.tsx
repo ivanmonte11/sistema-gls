@@ -19,6 +19,7 @@ interface Pedido {
   fecha: string;
   hora_pedido: string;
   fecha_pedido: string;
+  hora_entrega_solicitada: string | null;
 }
 
 export default function HistorialPedidos() {
@@ -106,6 +107,8 @@ export default function HistorialPedidos() {
               <th className="px-4 py-2">N° Pedido</th>
               <th className="px-4 py-2">Cliente</th>
               <th className="px-4 py-2">Teléfono</th>
+              <th className="px-4 py-2">Hora Pedido</th>
+              <th className="px-4 py-2">Hora Entrega</th>
               <th className="px-4 py-2">Entrega</th>
               <th className="px-4 py-2">Pago</th>
               <th className="px-4 py-2">Chimi</th>
@@ -120,6 +123,10 @@ export default function HistorialPedidos() {
                 <td className="px-4 py-3">{formatNumeroPedido(pedido.numero_pedido)}</td>
                 <td className="px-4 py-3">{pedido.nombre_cliente}</td>
                 <td className="px-4 py-3">{pedido.telefono_cliente || '-'}</td>
+                <td className="px-4 py-3">{pedido.hora_pedido.split(':').slice(0, 2).join(':')}</td>
+                <td className="px-4 py-3">
+                  {pedido.hora_entrega_solicitada ? pedido.hora_entrega_solicitada.split(':').slice(0, 2).join(':') : 'No especificada'}
+                </td>
                 <td className="px-4 py-3">
                   {pedido.tipo_entrega === 'envio' ? 
                     `Envío (${formatTipoEnvio(pedido.tipo_envio)})` : 

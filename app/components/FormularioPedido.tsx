@@ -38,6 +38,7 @@ export default function FormularioPedido() {
   const [conPapas, setConPapas] = useState<boolean>(false);
   const [cantidadPapas, setCantidadPapas] = useState<number>(0);
   const [cantidadPollo, setCantidadPollo] = useState<number>(0);
+  const [horaEntrega, setHoraEntrega] = useState<string>('');
   const [precioUnitario, setPrecioUnitario] = useState<number>(20000);
   const [precioFinal, setPrecioFinal] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -47,6 +48,12 @@ export default function FormularioPedido() {
   useEffect(() => {
     obtenerStock();
     checkAndResetSequence();
+    // Establecer hora por defecto (1 hora en el futuro)
+    const ahora = new Date();
+    ahora.setHours(ahora.getHours() + 1);
+    const hora = ahora.getHours().toString().padStart(2, '0');
+    const minutos = ahora.getMinutes().toString().padStart(2, '0');
+    setHoraEntrega(`${hora}:${minutos}`);
   }, []);
 
   useEffect(() => {
@@ -58,7 +65,6 @@ export default function FormularioPedido() {
   const calcularPrecio = () => {
     let total = cantidadPollo * precioUnitario;
     
-    // Costo de envío
     if (tipoEntrega === 'envio') {
       switch(tipoEnvio) {
         case 'cercano': total += 1500; break;
@@ -67,7 +73,6 @@ export default function FormularioPedido() {
       }
     }
 
-    // Costo de papas (ejemplo: $500 por porción)
     if (conPapas && cantidadPapas > 0) {
       total += cantidadPapas * 500;
     }
@@ -121,6 +126,20 @@ export default function FormularioPedido() {
     return numero;
   };
 
+  const validarHoraEntrega = () => {
+    if (!horaEntrega) return false;
+    
+    const [horasStr, minutosStr] = horaEntrega.split(':');
+    const horas = parseInt(horasStr);
+    const minutos = parseInt(minutosStr);
+    
+    const ahora = new Date();
+    const horaActual = ahora.getHours();
+    const minutosActual = ahora.getMinutes();
+    
+    return !(horas < horaActual || (horas === horaActual && minutos <= minutosActual));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -144,6 +163,11 @@ export default function FormularioPedido() {
       return;
     }
   
+    if (!horaEntrega || !validarHoraEntrega()) {
+      alert('La hora de entrega debe ser futura y dentro del horario de atención (10:00 - 22:00)');
+      return;
+    }
+  
     setIsLoading(true);
     
     try {
@@ -164,7 +188,8 @@ export default function FormularioPedido() {
           cantidadPapas,
           cantidadPollo,
           precioUnitario,
-          precioTotal: precioFinal
+          precioTotal: precioFinal,
+          horaEntrega
         }),
       });
   
@@ -242,6 +267,22 @@ export default function FormularioPedido() {
               readOnly
               className="w-full p-2 border rounded bg-gray-100"
             />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-1">Hora de entrega solicitada*</label>
+            <input
+              type="time"
+              value={horaEntrega}
+              onChange={(e) => setHoraEntrega(e.target.value)}
+              className="w-full p-2 border rounded"
+              required
+              min="10:00"
+              max="22:00"
+            />
+            <p className="text-sm text-gray-500 mt-1">
+              Los pedidos se preparan según la hora de entrega solicitada (más temprano = mayor prioridad)
+            </p>
           </div>
         </div>
 

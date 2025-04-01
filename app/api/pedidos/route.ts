@@ -83,9 +83,16 @@ export async function GET(request: Request) {
           precio_total,
           fecha,
           hora_pedido,
-          fecha_pedido
+          fecha_pedido,
+          hora_entrega_solicitada
          FROM pedidos 
-         ORDER BY fecha_pedido DESC, numero_pedido DESC 
+         ORDER BY 
+           CASE 
+             WHEN hora_entrega_solicitada IS NULL THEN 1
+             ELSE 0
+           END,
+           hora_entrega_solicitada ASC,
+           hora_pedido ASC
          LIMIT 1`
       );
       client.release();
@@ -113,9 +120,17 @@ export async function GET(request: Request) {
         precio_total,
         fecha,
         hora_pedido,
-        fecha_pedido
+        fecha_pedido,
+        hora_entrega_solicitada
        FROM pedidos 
-       ORDER BY fecha_pedido DESC, numero_pedido DESC 
+       WHERE fecha_pedido = CURRENT_DATE
+       ORDER BY 
+         CASE 
+           WHEN hora_entrega_solicitada IS NULL THEN 1
+           ELSE 0
+         END,
+         hora_entrega_solicitada ASC,
+         hora_pedido ASC
        LIMIT $1`,
       [searchParams.get('limit') || '100']
     );
@@ -153,7 +168,8 @@ export async function POST(request: Request) {
     
     const requiredFields = [
       'nombre', 'tipoEntrega', 'metodoPago', 
-      'cantidadPollo', 'precioUnitario', 'precioTotal'
+      'cantidadPollo', 'precioUnitario', 'precioTotal',
+      'horaEntrega'  // Nuevo campo requerido
     ];
     const missingFields = requiredFields.filter(field => !data[field]);
     
@@ -163,6 +179,32 @@ export async function POST(request: Request) {
           success: false, 
           error: 'Faltan campos requeridos',
           missingFields 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validar hora de entrega
+    const [horas, minutos] = data.horaEntrega.split(':').map(Number);
+    const ahora = new Date();
+    const horaActual = ahora.getHours();
+    const minutosActual = ahora.getMinutes();
+    
+    if (horas < horaActual || (horas === horaActual && minutos <= minutosActual)) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'La hora de entrega debe ser futura'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (horas < 10 || horas >= 22) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Horario de atención: 10:00 a 22:00'
         },
         { status: 400 }
       );
@@ -189,12 +231,14 @@ export async function POST(request: Request) {
         precio_total,
         fecha,
         hora_pedido,
-        fecha_pedido
+        fecha_pedido,
+        hora_entrega_solicitada
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
         NOW() AT TIME ZONE $14,
         (NOW() AT TIME ZONE $14)::time,
-        (NOW() AT TIME ZONE $14)::date
+        (NOW() AT TIME ZONE $14)::date,
+        $15
       ) RETURNING id, numero_pedido`,
       [
         numeroPedido,
@@ -210,7 +254,8 @@ export async function POST(request: Request) {
         data.cantidadPollo,
         Number(data.precioUnitario),
         Number(data.precioTotal),
-        TIMEZONE
+        TIMEZONE,
+        data.horaEntrega
       ]
     );
 
