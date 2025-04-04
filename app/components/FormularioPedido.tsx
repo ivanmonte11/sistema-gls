@@ -37,7 +37,7 @@ export default function FormularioPedido() {
   const [conChimichurri, setConChimichurri] = useState<boolean>(false);
   const [conPapas, setConPapas] = useState<boolean>(false);
   const [cantidadPapas, setCantidadPapas] = useState<number>(0);
-  const [cantidadPollo, setCantidadPollo] = useState<number>(0);
+  const [cantidadPollo, setCantidadPollo] = useState<number | ''>('');
   const [horaEntrega, setHoraEntrega] = useState<string>('');
   const [precioUnitario, setPrecioUnitario] = useState<number>(20000);
   const [precioFinal, setPrecioFinal] = useState<number>(0);
@@ -57,13 +57,15 @@ export default function FormularioPedido() {
   }, []);
 
   useEffect(() => {
-    if (cantidadPollo > 0) {
+    if (typeof cantidadPollo === 'number' && cantidadPollo > 0) {
       calcularPrecio();
+    } else {
+      setPrecioFinal(0);
     }
   }, [cantidadPollo, tipoEntrega, tipoEnvio, conPapas, cantidadPapas]);
 
   const calcularPrecio = () => {
-    let total = cantidadPollo * precioUnitario;
+    let total = (cantidadPollo as number) * precioUnitario;
     
     if (tipoEntrega === 'envio') {
       switch(tipoEnvio) {
@@ -126,20 +128,6 @@ export default function FormularioPedido() {
     return numero;
   };
 
-  const validarHoraEntrega = () => {
-    if (!horaEntrega) return false;
-    
-    const [horasStr, minutosStr] = horaEntrega.split(':');
-    const horas = parseInt(horasStr);
-    const minutos = parseInt(minutosStr);
-    
-    const ahora = new Date();
-    const horaActual = ahora.getHours();
-    const minutosActual = ahora.getMinutes();
-    
-    return !(horas < horaActual || (horas === horaActual && minutos <= minutosActual));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -148,7 +136,7 @@ export default function FormularioPedido() {
       return;
     }
   
-    if (cantidadPollo <= 0) {
+    if (cantidadPollo === '' || cantidadPollo <= 0) {
       alert('La cantidad debe ser mayor a 0');
       return;
     }
@@ -160,11 +148,6 @@ export default function FormularioPedido() {
   
     if (tipoEntrega === 'envio' && !direccion.trim()) {
       alert('Ingrese la dirección de envío');
-      return;
-    }
-  
-    if (!horaEntrega || !validarHoraEntrega()) {
-      alert('La hora de entrega debe ser futura y dentro del horario de atención (10:00 - 22:00)');
       return;
     }
   
@@ -185,7 +168,7 @@ export default function FormularioPedido() {
           metodoPago,
           conChimichurri,
           conPapas,
-          cantidadPapas,
+          cantidadPapas: conPapas ? cantidadPapas : 0,
           cantidadPollo,
           precioUnitario,
           precioTotal: precioFinal,
@@ -205,7 +188,7 @@ export default function FormularioPedido() {
       alert('Pedido registrado con éxito');
       setNombre('');
       setTelefono('');
-      setCantidadPollo(0);
+      setCantidadPollo('');
       setConChimichurri(false);
       setConPapas(false);
       setCantidadPapas(0);
@@ -221,16 +204,23 @@ export default function FormularioPedido() {
     }
   };
 
-  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<number>>) => {
-    const value = parseFloat(e.target.value);
-    setter(isNaN(value) ? 0 : value);
+  const handleCantidadPolloChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '') {
+      setCantidadPollo('');
+    } else {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue)) {
+        setCantidadPollo(numValue);
+      }
+    }
   };
 
   return (
     <div className="max-w-md mx-auto p-4">
       <div className="bg-white p-4 mb-6 rounded-lg shadow">
         <h2 className="text-xl font-bold mb-2">Stock Disponible</h2>
-        <TablaStock stock={stockData.cantidad} precio={20000} />
+        <TablaStock stock={stockData.cantidad} precio={precioUnitario} />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-lg shadow">
@@ -270,15 +260,12 @@ export default function FormularioPedido() {
           </div>
 
           <div>
-            <label className="block text-gray-700 mb-1">Hora de entrega solicitada*</label>
+            <label className="block text-gray-700 mb-1">Hora de entrega solicitada</label>
             <input
               type="time"
               value={horaEntrega}
               onChange={(e) => setHoraEntrega(e.target.value)}
               className="w-full p-2 border rounded"
-              required
-              min="10:00"
-              max="22:00"
             />
             <p className="text-sm text-gray-500 mt-1">
               Los pedidos se preparan según la hora de entrega solicitada (más temprano = mayor prioridad)
@@ -357,7 +344,7 @@ export default function FormularioPedido() {
                   value={direccion}
                   onChange={(e) => setDireccion(e.target.value)}
                   className="w-full p-2 border rounded"
-                  required
+                  required={tipoEntrega === 'envio'}
                 />
               </div>
             </>
@@ -411,6 +398,7 @@ export default function FormularioPedido() {
                 onChange={(e) => setCantidadPapas(Number(e.target.value))}
                 className="p-1 border rounded"
               >
+                <option value="0">0</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
@@ -425,10 +413,11 @@ export default function FormularioPedido() {
             <label className="block text-gray-700 mb-1">Cantidad de pollos*</label>
             <input
               type="number"
-              value={cantidadPollo || ''}
-              onChange={(e) => handleNumberChange(e, setCantidadPollo)}
+              value={cantidadPollo}
+              onChange={handleCantidadPolloChange}
+              step="0.5"
+              min="0.5"
               className="w-full p-2 border rounded"
-              min="1"
               required
             />
           </div>

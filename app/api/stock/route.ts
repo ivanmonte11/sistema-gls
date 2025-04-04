@@ -12,7 +12,7 @@ export async function GET() {
     client.release();
 
     return NextResponse.json({
-      cantidad: Number(res.rows[0]?.cantidad) || 0,
+      cantidad: parseFloat(res.rows[0]?.cantidad) || 0,
       precio: parseFloat(res.rows[0]?.precio) || 0
     });
   } catch (error) {

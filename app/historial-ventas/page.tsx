@@ -44,7 +44,10 @@ export default function HistorialPedidos() {
             : pedido.precio_total,
           precio_unitario: typeof pedido.precio_unitario === 'string' 
             ? parseFloat(pedido.precio_unitario) 
-            : pedido.precio_unitario
+            : pedido.precio_unitario,
+          cantidad_pollo: typeof pedido.cantidad_pollo === 'string'
+            ? parseFloat(pedido.cantidad_pollo)
+            : pedido.cantidad_pollo
         }));
         
         setPedidos(pedidosFormateados || []);
@@ -93,6 +96,10 @@ export default function HistorialPedidos() {
     return isNaN(numero) ? '$0.00' : `$${numero.toFixed(2)}`;
   };
 
+  const formatCantidadPollo = (cantidad: number) => {
+    return cantidad % 1 === 0 ? cantidad.toString() : cantidad.toFixed(1);
+  };
+
   if (isLoading) return <div className="p-4 text-center">Cargando...</div>;
   if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
 
@@ -139,7 +146,7 @@ export default function HistorialPedidos() {
                 <td className="px-4 py-3 text-center">
                   {pedido.con_papas ? `${pedido.cantidad_papas} 🍟` : '❌'}
                 </td>
-                <td className="px-4 py-3">{pedido.cantidad_pollo}</td>
+                <td className="px-4 py-3">{formatCantidadPollo(pedido.cantidad_pollo)}</td>
                 <td className="px-4 py-3 font-semibold">
                   {formatPrecio(pedido.precio_total)}
                 </td>

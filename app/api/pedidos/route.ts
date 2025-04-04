@@ -169,7 +169,7 @@ export async function POST(request: Request) {
     const requiredFields = [
       'nombre', 'tipoEntrega', 'metodoPago', 
       'cantidadPollo', 'precioUnitario', 'precioTotal',
-      'horaEntrega'  // Nuevo campo requerido
+      'horaEntrega'
     ];
     const missingFields = requiredFields.filter(field => !data[field]);
     
@@ -184,7 +184,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validar hora de entrega
+    // Validar cantidad de pollo (múltiplo de 0.5)
+    if (data.cantidadPollo <= 0 || data.cantidadPollo % 0.5 !== 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'La cantidad debe ser mayor a 0 y múltiplo de 0.5 (ej: 0.5, 1, 1.5)' 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validar hora de entrega (solo que sea futura)
     const [horas, minutos] = data.horaEntrega.split(':').map(Number);
     const ahora = new Date();
     const horaActual = ahora.getHours();
@@ -200,17 +211,25 @@ export async function POST(request: Request) {
       );
     }
 
-    if (horas < 10 || horas >= 22) {
+    client = await pool.connect();
+    
+    // Verificar stock antes de procesar
+    const stockResult = await client.query(
+      'SELECT cantidad FROM stock WHERE producto = $1',
+      ['pollo']
+    );
+    const stockDisponible = parseFloat(stockResult.rows[0]?.cantidad) || 0;
+    
+    if (stockDisponible < data.cantidadPollo) {
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Horario de atención: 10:00 a 22:00'
+          error: `Stock insuficiente. Disponible: ${stockDisponible}` 
         },
         { status: 400 }
       );
     }
 
-    client = await pool.connect();
     const numeroPedido = await generarNumeroPedido(client);
     await client.query('BEGIN');
     
