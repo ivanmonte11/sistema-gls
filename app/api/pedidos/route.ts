@@ -195,22 +195,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validar hora de entrega (solo que sea futura)
-    const [horas, minutos] = data.horaEntrega.split(':').map(Number);
-    const ahora = new Date();
-    const horaActual = ahora.getHours();
-    const minutosActual = ahora.getMinutes();
-    
-    if (horas < horaActual || (horas === horaActual && minutos <= minutosActual)) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'La hora de entrega debe ser futura'
-        },
-        { status: 400 }
-      );
-    }
-
     client = await pool.connect();
     
     // Verificar stock antes de procesar
