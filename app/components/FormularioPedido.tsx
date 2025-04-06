@@ -64,9 +64,21 @@ export default function FormularioPedido() {
     }
   }, [cantidadPollo, tipoEntrega, tipoEnvio, conPapas, cantidadPapas]);
 
+  // FUNCIÓN ACTUALIZADA - NUEVO CÁLCULO
   const calcularPrecio = () => {
-    let total = (cantidadPollo as number) * precioUnitario;
-    
+    let total = 0;
+    const cantidadEntera = Math.floor(cantidadPollo as number);
+    const tieneMedioPollo = (cantidadPollo as number) % 1 !== 0;
+
+    // 1. Pollos enteros
+    total += cantidadEntera * precioUnitario;
+
+    // 2. Medio pollo (mitad de precio + $1000 adicionales)
+    if (tieneMedioPollo) {
+      total += (precioUnitario / 2) + 1000;
+    }
+
+    // 3. Costo de envío
     if (tipoEntrega === 'envio') {
       switch(tipoEnvio) {
         case 'cercano': total += 1500; break;
@@ -75,6 +87,7 @@ export default function FormularioPedido() {
       }
     }
 
+    // 4. Papas extras
     if (conPapas && cantidadPapas > 0) {
       total += cantidadPapas * 500;
     }
@@ -88,7 +101,7 @@ export default function FormularioPedido() {
       if (res.ok) {
         const data: StockData = await res.json();
         setStockData(data);
-        setPrecioUnitario(20000);
+        setPrecioUnitario(data.precio || 20000);
       }
     } catch (error) {
       console.error('Error obteniendo stock:', error);

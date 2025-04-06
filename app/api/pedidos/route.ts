@@ -168,7 +168,7 @@ export async function POST(request: Request) {
     
     const requiredFields = [
       'nombre', 'tipoEntrega', 'metodoPago', 
-      'cantidadPollo', 'precioUnitario', 'precioTotal',
+      'cantidadPollo', 'precioUnitario',
       'horaEntrega'
     ];
     const missingFields = requiredFields.filter(field => !data[field]);
@@ -214,6 +214,33 @@ export async function POST(request: Request) {
       );
     }
 
+    // CALCULO DEL PRECIO ACTUALIZADO
+    const precioUnitario = Number(data.precioUnitario);
+    let precioTotal = 0;
+    const cantidadEntera = Math.floor(data.cantidadPollo);
+    const tieneMedioPollo = data.cantidadPollo % 1 !== 0;
+
+    // Pollos enteros
+    precioTotal += cantidadEntera * precioUnitario;
+
+    // Medio pollo (mitad del precio + $1000 adicionales)
+    if (tieneMedioPollo) {
+      precioTotal += (precioUnitario / 2) + 1000;
+    }
+
+    // Costos adicionales (envío, papas, etc.)
+    if (data.tipoEntrega === 'envio') {
+      switch(data.tipoEnvio) {
+        case 'cercano': precioTotal += 1500; break;
+        case 'lejano': precioTotal += 2500; break;
+        case 'la_banda': precioTotal += 3000; break;
+      }
+    }
+
+    if (data.conPapas && data.cantidadPapas > 0) {
+      precioTotal += data.cantidadPapas * 500;
+    }
+
     const numeroPedido = await generarNumeroPedido(client);
     await client.query('BEGIN');
     
@@ -255,8 +282,8 @@ export async function POST(request: Request) {
         data.conPapas || false,
         data.conPapas ? (data.cantidadPapas || 0) : 0,
         data.cantidadPollo,
-        Number(data.precioUnitario),
-        Number(data.precioTotal),
+        precioUnitario,
+        precioTotal,
         TIMEZONE,
         data.horaEntrega
       ]
@@ -274,7 +301,14 @@ export async function POST(request: Request) {
       success: true,
       message: 'Pedido registrado con éxito',
       pedidoId: result.rows[0].id,
-      numeroPedido: result.rows[0].numero_pedido
+      numeroPedido: result.rows[0].numero_pedido,
+      total: precioTotal,
+      desglose: {
+        pollosEnteros: cantidadEntera,
+        medioPollo: tieneMedioPollo,
+        costoMedioPollo: tieneMedioPollo ? (precioUnitario / 2) + 1000 : 0,
+        adicional: tieneMedioPollo ? 1000 : 0
+      }
     });
     
   } catch (error) {
