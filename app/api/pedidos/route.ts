@@ -238,7 +238,7 @@ export async function POST(request: Request) {
     }
 
     if (data.conPapas && data.cantidadPapas > 0) {
-      precioTotal += data.cantidadPapas * 500;
+      precioTotal += data.cantidadPapas * 4000;
     }
 
     const numeroPedido = await generarNumeroPedido(client);

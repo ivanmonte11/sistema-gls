@@ -452,7 +452,7 @@ export default function FormularioPedido() {
             )}
             {conPapas && cantidadPapas > 0 && (
               <div className="text-sm text-gray-600 mt-1">
-                {cantidadPapas} porción(es) de papas: +${formatNumber(cantidadPapas * 500)}
+                {cantidadPapas} porción(es) de papas: +${formatNumber(cantidadPapas * 4000)}
               </div>
             )}
           </div>
