@@ -2,3 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Estilos para las tablas de pedidos */
+.container {
+    max-width: 100%;
+    padding: 0 1rem;
+  }
+  
+  .shadow-md {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .rounded-lg {
+    border-radius: 0.5rem;
+  }
+  
+  /* Estilos para las filas de la tabla */
+  tr {
+    transition: background-color 0.2s ease;
+  }
+  
+  /* Estilos para el botón de entrega */
+  .bg-green-500 {
+    background-color: #10B981;
+  }
+  
+  .hover\:bg-green-600:hover {
+    background-color: #059669;
+  }
+  
+  /* Colores de fondo para las secciones */
+  .bg-yellow-50 {
+    background-color: #FFFBEB;
+  }
+  
+  .bg-yellow-100 {
+    background-color: #FEF3C7;
+  }
+  
+  .hover\:bg-yellow-50:hover {
+    background-color: #FFFBEB;
+  }
+  
+  .bg-green-50 {
+    background-color: #ECFDF5;
+  }
+  
+  .bg-green-100 {
+    background-color: #D1FAE5;
+  }
+  
+  .hover\:bg-green-50:hover {
+    background-color: #ECFDF5;
+  }
+  
+  /* Estilos para las celdas de la tabla */
+  .px-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .py-3 {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+  
+  /* Estilos para el estado de carga y errores */
+  .text-center {
+    text-align: center;
+  }
+  
+  .text-red-500 {
+    color: #EF4444;
+  }
+  
+  .text-gray-500 {
+    color: #6B7280;
+  }
+  
+  /* Transición para el botón */
+  .transition-colors {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }

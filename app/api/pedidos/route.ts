@@ -64,7 +64,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const client = await pool.connect();
 
-    if (searchParams.get('ultimo') === 'true') {
+    // Nuevos parámetros de consulta
+    const entregado = searchParams.get('entregado');
+    const fecha = searchParams.get('fecha');
+    const ultimo = searchParams.get('ultimo') === 'true';
+    const limit = searchParams.get('limit') || '100';
+
+    if (ultimo) {
       const result = await client.query(
         `SELECT 
           id,
@@ -84,7 +90,9 @@ export async function GET(request: Request) {
           fecha,
           hora_pedido,
           fecha_pedido,
-          hora_entrega_solicitada
+          hora_entrega_solicitada,
+          entregado,
+          fecha_entrega
          FROM pedidos 
          ORDER BY 
            CASE 
@@ -102,8 +110,8 @@ export async function GET(request: Request) {
       });
     }
 
-    const result = await client.query(
-      `SELECT 
+    // Construcción dinámica de la consulta
+    let query = `SELECT 
         id,
         numero_pedido,
         nombre_cliente,
@@ -121,20 +129,41 @@ export async function GET(request: Request) {
         fecha,
         hora_pedido,
         fecha_pedido,
-        hora_entrega_solicitada
-       FROM pedidos 
-       WHERE fecha_pedido = CURRENT_DATE
-       ORDER BY 
+        hora_entrega_solicitada,
+        entregado,
+        fecha_entrega
+       FROM pedidos`;
+    
+    const params = [];
+    const conditions = [];
+
+    if (entregado !== null) {
+      conditions.push(`entregado = $${params.length + 1}`);
+      params.push(entregado === 'true');
+    }
+
+    if (fecha) {
+      conditions.push(`fecha_pedido = $${params.length + 1}`);
+      params.push(fecha);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    query += ` ORDER BY 
          CASE 
            WHEN hora_entrega_solicitada IS NULL THEN 1
            ELSE 0
          END,
          hora_entrega_solicitada ASC,
          hora_pedido ASC
-       LIMIT $1`,
-      [searchParams.get('limit') || '100']
-    );
+       LIMIT $${params.length + 1}`;
+    params.push(limit);
+
+    const result = await client.query(query, params);
     client.release();
+    
     return NextResponse.json({ 
       success: true, 
       data: result.rows 
@@ -328,6 +357,97 @@ export async function POST(request: Request) {
       { 
         success: false,
         error: 'Error al registrar el pedido',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : null
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// Nuevo endpoint para marcar como entregado
+export async function PUT(request: Request) {
+  let client;
+  try {
+    const { id } = await request.json();
+    
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'ID de pedido no proporcionado' },
+        { status: 400 }
+      );
+    }
+
+    client = await pool.connect();
+    await client.query('BEGIN');
+    
+    const result = await client.query(
+      `UPDATE pedidos 
+       SET entregado = true, 
+           fecha_entrega = NOW() AT TIME ZONE $1
+       WHERE id = $2
+       RETURNING *`,
+      [TIMEZONE, id]
+    );
+
+    await client.query('COMMIT');
+    client.release();
+    
+    if (result.rowCount === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Pedido no encontrado' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Pedido marcado como entregado'
+    });
+    
+  } catch (error) {
+    if (client) {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+    
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    console.error('Error en PUT /api/pedidos:', errorMessage);
+    
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Error al actualizar el pedido',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : null
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// Nuevo endpoint para obtener fechas disponibles
+export async function GET_FECHAS() {
+  try {
+    const client = await pool.connect();
+    const result = await client.query(
+      `SELECT DISTINCT fecha_pedido 
+       FROM pedidos 
+       ORDER BY fecha_pedido DESC`
+    );
+    client.release();
+
+    return NextResponse.json({
+      success: true,
+      data: result.rows.map(row => row.fecha_pedido)
+    });
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    console.error('Error en GET /api/pedidos/fechas:', errorMessage);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Error al obtener fechas de pedidos',
         details: process.env.NODE_ENV === 'development' ? errorMessage : null
       },
       { status: 500 }
