@@ -89,7 +89,7 @@ export default function FormularioPedido() {
 
     // 4. Papas extras
     if (conPapas && cantidadPapas > 0) {
-      total += cantidadPapas * 500;
+      total += cantidadPapas * 4000;
     }
 
     setPrecioFinal(total);

@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
 
+// Función para generar número de pedido único
 async function generarNumeroPedido(client: any): Promise<string> {
   const ahora = new Date();
   const opciones = { timeZone: 'America/Argentina/Buenos_Aires' };
@@ -59,114 +60,53 @@ async function generarNumeroPedido(client: any): Promise<string> {
   }
 }
 
+// Endpoint GET para obtener pedidos
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const limit = searchParams.get('limit') || '100';
+  const estado = searchParams.get('estado');
+  const ultimo = searchParams.get('ultimo') === 'true';
+  const fecha = searchParams.get('fecha') || 'CURRENT_DATE';
+  
   try {
-    const { searchParams } = new URL(request.url);
     const client = await pool.connect();
-
-    // Nuevos parámetros de consulta
-    const entregado = searchParams.get('entregado');
-    const fecha = searchParams.get('fecha');
-    const ultimo = searchParams.get('ultimo') === 'true';
-    const limit = searchParams.get('limit') || '100';
+    let query = '';
+    const params = [];
 
     if (ultimo) {
-      const result = await client.query(
-        `SELECT 
-          id,
-          numero_pedido,
-          nombre_cliente,
-          telefono_cliente,
-          tipo_entrega,
-          tipo_envio,
-          direccion,
-          metodo_pago,
-          con_chimichurri,
-          con_papas,
-          cantidad_papas,
-          cantidad_pollo,
-          precio_unitario,
-          precio_total,
-          fecha,
-          hora_pedido,
-          fecha_pedido,
-          hora_entrega_solicitada,
-          entregado,
-          fecha_entrega
-         FROM pedidos 
-         ORDER BY 
-           CASE 
-             WHEN hora_entrega_solicitada IS NULL THEN 1
-             ELSE 0
-           END,
-           hora_entrega_solicitada ASC,
-           hora_pedido ASC
-         LIMIT 1`
-      );
-      client.release();
-      return NextResponse.json({
-        success: true,
-        data: result.rows[0] || null
-      });
+      query = `SELECT * FROM pedidos`;
+      if (estado) {
+        query += ' WHERE estado = $1';
+        params.push(estado);
+      }
+      query += ' ORDER BY fecha_pedido DESC, hora_pedido DESC LIMIT 1';
+    } else {
+      query = `SELECT * FROM pedidos WHERE ${estado ? 'estado = $1 AND' : ''} fecha_pedido = ${fecha === 'CURRENT_DATE' ? 'CURRENT_DATE' : '$1'}`;
+      if (estado) {
+        params.push(estado);
+        if (fecha !== 'CURRENT_DATE') {
+          params.push(fecha);
+        }
+      } else if (fecha !== 'CURRENT_DATE') {
+        params.push(fecha);
+      }
+      query += ` ORDER BY 
+        CASE 
+          WHEN hora_entrega_solicitada IS NULL THEN 1
+          ELSE 0
+        END,
+        hora_entrega_solicitada ASC,
+        hora_pedido ASC
+      LIMIT $${params.length + 1}`;
+      params.push(limit);
     }
-
-    // Construcción dinámica de la consulta
-    let query = `SELECT 
-        id,
-        numero_pedido,
-        nombre_cliente,
-        telefono_cliente,
-        tipo_entrega,
-        tipo_envio,
-        direccion,
-        metodo_pago,
-        con_chimichurri,
-        con_papas,
-        cantidad_papas,
-        cantidad_pollo,
-        precio_unitario,
-        precio_total,
-        fecha,
-        hora_pedido,
-        fecha_pedido,
-        hora_entrega_solicitada,
-        entregado,
-        fecha_entrega
-       FROM pedidos`;
-    
-    const params = [];
-    const conditions = [];
-
-    if (entregado !== null) {
-      conditions.push(`entregado = $${params.length + 1}`);
-      params.push(entregado === 'true');
-    }
-
-    if (fecha) {
-      conditions.push(`fecha_pedido = $${params.length + 1}`);
-      params.push(fecha);
-    }
-
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
-
-    query += ` ORDER BY 
-         CASE 
-           WHEN hora_entrega_solicitada IS NULL THEN 1
-           ELSE 0
-         END,
-         hora_entrega_solicitada ASC,
-         hora_pedido ASC
-       LIMIT $${params.length + 1}`;
-    params.push(limit);
 
     const result = await client.query(query, params);
     client.release();
-    
-    return NextResponse.json({ 
-      success: true, 
-      data: result.rows 
+
+    return NextResponse.json({
+      success: true,
+      data: result.rows
     });
     
   } catch (error) {
@@ -183,6 +123,7 @@ export async function GET(request: Request) {
   }
 }
 
+// Endpoint POST para crear nuevos pedidos
 export async function POST(request: Request) {
   let client;
   try {
@@ -213,7 +154,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validar cantidad de pollo (múltiplo de 0.5)
+    // Validar cantidad de pollo
     if (data.cantidadPollo <= 0 || data.cantidadPollo % 0.5 !== 0) {
       return NextResponse.json(
         { 
@@ -226,7 +167,7 @@ export async function POST(request: Request) {
 
     client = await pool.connect();
     
-    // Verificar stock antes de procesar
+    // Verificar stock
     const stockResult = await client.query(
       'SELECT cantidad FROM stock WHERE producto = $1',
       ['pollo']
@@ -243,21 +184,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // CALCULO DEL PRECIO ACTUALIZADO
+    // Cálculo del precio total
     const precioUnitario = Number(data.precioUnitario);
     let precioTotal = 0;
     const cantidadEntera = Math.floor(data.cantidadPollo);
     const tieneMedioPollo = data.cantidadPollo % 1 !== 0;
 
-    // Pollos enteros
     precioTotal += cantidadEntera * precioUnitario;
 
-    // Medio pollo (mitad del precio + $1000 adicionales)
     if (tieneMedioPollo) {
       precioTotal += (precioUnitario / 2) + 1000;
     }
 
-    // Costos adicionales (envío, papas, etc.)
     if (data.tipoEntrega === 'envio') {
       switch(data.tipoEnvio) {
         case 'cercano': precioTotal += 1500; break;
@@ -291,13 +229,15 @@ export async function POST(request: Request) {
         fecha,
         hora_pedido,
         fecha_pedido,
-        hora_entrega_solicitada
+        hora_entrega_solicitada,
+        estado
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
         NOW() AT TIME ZONE $14,
         (NOW() AT TIME ZONE $14)::time,
         (NOW() AT TIME ZONE $14)::date,
-        $15
+        $15,
+        'pendiente'
       ) RETURNING id, numero_pedido`,
       [
         numeroPedido,
@@ -331,13 +271,7 @@ export async function POST(request: Request) {
       message: 'Pedido registrado con éxito',
       pedidoId: result.rows[0].id,
       numeroPedido: result.rows[0].numero_pedido,
-      total: precioTotal,
-      desglose: {
-        pollosEnteros: cantidadEntera,
-        medioPollo: tieneMedioPollo,
-        costoMedioPollo: tieneMedioPollo ? (precioUnitario / 2) + 1000 : 0,
-        adicional: tieneMedioPollo ? 1000 : 0
-      }
+      total: precioTotal
     });
     
   } catch (error) {
@@ -347,11 +281,7 @@ export async function POST(request: Request) {
     }
     
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    console.error('Error en POST /api/pedidos:', {
-      message: errorMessage,
-      stack: error instanceof Error ? error.stack : null,
-      timestamp: new Date().toISOString()
-    });
+    console.error('Error en POST /api/pedidos:', errorMessage);
 
     return NextResponse.json(
       { 
@@ -364,93 +294,86 @@ export async function POST(request: Request) {
   }
 }
 
-// Nuevo endpoint para marcar como entregado
-export async function PUT(request: Request) {
+// Endpoint PATCH para actualizar estados de pedidos
+export async function PATCH(request: Request) {
   let client;
   try {
-    const { id } = await request.json();
-    
-    if (!id) {
+    if (!request.headers.get('content-type')?.includes('application/json')) {
       return NextResponse.json(
-        { success: false, error: 'ID de pedido no proporcionado' },
+        { success: false, error: 'Content-Type debe ser application/json' },
+        { status: 400 }
+      );
+    }
+
+    const { id, estado } = await request.json();
+
+    if (!id || !estado) {
+      return NextResponse.json(
+        { success: false, error: 'Se requieren ID y estado' },
+        { status: 400 }
+      );
+    }
+
+    const estadosValidos = ['pendiente', 'preparando', 'en_camino', 'entregado', 'cancelado'];
+    if (!estadosValidos.includes(estado)) {
+      return NextResponse.json(
+        { success: false, error: 'Estado no válido' },
         { status: 400 }
       );
     }
 
     client = await pool.connect();
     await client.query('BEGIN');
-    
-    const result = await client.query(
-      `UPDATE pedidos 
-       SET entregado = true, 
-           fecha_entrega = NOW() AT TIME ZONE $1
-       WHERE id = $2
-       RETURNING *`,
-      [TIMEZONE, id]
-    );
 
-    await client.query('COMMIT');
-    client.release();
-    
+    let query = 'UPDATE pedidos SET estado = $1';
+    const params = [estado];
+
+    // Si el estado es "entregado", registrar hora de entrega real
+    if (estado === 'entregado') {
+      query += ', hora_entrega_real = NOW() AT TIME ZONE $2';
+      params.push(TIMEZONE);
+    }
+
+    query += ' WHERE id = $' + (params.length + 1) + ' RETURNING *';
+    params.push(id);
+
+    const result = await client.query(query, params);
+
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      client.release();
       return NextResponse.json(
         { success: false, error: 'Pedido no encontrado' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows[0],
-      message: 'Pedido marcado como entregado'
-    });
-    
-  } catch (error) {
-    if (client) {
-      await client.query('ROLLBACK');
-      client.release();
-    }
-    
-    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    console.error('Error en PUT /api/pedidos:', errorMessage);
-    
-    return NextResponse.json(
-      { 
-        success: false,
-        error: 'Error al actualizar el pedido',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : null
-      },
-      { status: 500 }
-    );
-  }
-}
-
-// Nuevo endpoint para obtener fechas disponibles
-export async function GET_FECHAS() {
-  try {
-    const client = await pool.connect();
-    const result = await client.query(
-      `SELECT DISTINCT fecha_pedido 
-       FROM pedidos 
-       ORDER BY fecha_pedido DESC`
-    );
+    await client.query('COMMIT');
     client.release();
 
     return NextResponse.json({
       success: true,
-      data: result.rows.map(row => row.fecha_pedido)
+      message: 'Estado actualizado',
+      data: result.rows[0]
     });
-    
+
   } catch (error) {
+    if (client) {
+      await client.query('ROLLBACK').catch(e => console.error('Error en ROLLBACK:', e));
+      client.release();
+    }
+    
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    console.error('Error en GET /api/pedidos/fechas:', errorMessage);
+    console.error('Error en PATCH /api/pedidos:', errorMessage);
+
     return NextResponse.json(
       { 
         success: false,
-        error: 'Error al obtener fechas de pedidos',
+        error: 'Error al actualizar estado',
         details: process.env.NODE_ENV === 'development' ? errorMessage : null
       },
       { status: 500 }
     );
   }
 }
+

@@ -101,7 +101,7 @@ export default function Home() {
             <p className="text-gray-600">Revisa el registro completo de pedidos realizados.</p>
           </div>
         </Link>
-        {/* Tarjeta 5: Reportes y Estadísticas */}
+        {/* Tarjeta 5: Reportes y Estadísticas 
         <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
           <div className="text-red-600 mb-4">
             <svg
@@ -122,6 +122,7 @@ export default function Home() {
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Reportes y Estadísticas</h2>
           <p className="text-gray-600">Genera reportes y analiza el rendimiento del negocio.</p>
         </div>
+        */}
 
         {/* Tarjeta 6: Configuración */}
         <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
