@@ -96,8 +96,8 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
             </style>
           </head>
           <body>
-            <div class="header">POLLERÍA EL BUEN SABOR</div>
-            <div class="header">Av. San Martín 1234 - Tel: 381-1234567</div>
+            <div class="header">GRANJA LA COLONIA</div>
+            <div class="header">Francisco Viano 130 - Tel: 3856146824</div>
             <div class="divider"></div>
             <div class="header">PEDIDO #${pedido.numero_pedido}</div>
             <p>${new Date(pedido.fecha_pedido).toLocaleString('es-AR')}</p>
