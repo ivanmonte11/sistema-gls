@@ -314,36 +314,42 @@ export default function HistorialVentas() {
 
       <div className="mt-8 bg-white p-6 rounded-lg shadow">
         <h2 className="text-xl font-bold mb-4">Resumen de Entregas</h2>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-green-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-green-800">Total Entregados</h3>
-            <p className="text-2xl font-bold">{estadisticas.total}</p>
-          </div>
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-blue-800">Ventas Totales</h3>
-            <p className="text-2xl font-bold">
-              {formatPrecio(estadisticas.ventas_totales)}
-            </p>
-          </div>
-          <div className="bg-yellow-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-yellow-800">Efectivo</h3>
-            <p className="text-2xl font-bold">
-              {formatPrecio(totalesPorMetodo.efectivo)}
-            </p>
-          </div>
-          <div className="bg-purple-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-purple-800">Débito</h3>
-            <p className="text-2xl font-bold">
-              {formatPrecio(totalesPorMetodo.debito)}
-            </p>
-          </div>
-          <div className="bg-red-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-red-800">Crédito</h3>
-            <p className="text-2xl font-bold">
-              {formatPrecio(totalesPorMetodo.credito)}
-            </p>
-          </div>
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+  <div className="bg-green-50 p-4 rounded-lg">
+    <h3 className="font-semibold text-green-800">Total Entregados</h3>
+    <p className="text-2xl font-bold">{estadisticas.total}</p>
+  </div>
+  <div className="bg-blue-50 p-4 rounded-lg">
+    <h3 className="font-semibold text-blue-800">Ventas Totales</h3>
+    <p className="text-2xl font-bold">
+      {formatPrecio(estadisticas.ventas_totales)}
+    </p>
+  </div>
+  <div className="bg-yellow-50 p-4 rounded-lg">
+    <h3 className="font-semibold text-yellow-800">Efectivo</h3>
+    <p className="text-2xl font-bold">
+      {formatPrecio(totalesPorMetodo.efectivo)}
+    </p>
+  </div>
+  <div className="bg-purple-50 p-4 rounded-lg">
+    <h3 className="font-semibold text-purple-800">Débito</h3>
+    <p className="text-2xl font-bold">
+      {formatPrecio(totalesPorMetodo.debito)}
+    </p>
+  </div>
+  <div className="bg-red-50 p-4 rounded-lg">
+    <h3 className="font-semibold text-red-800">Crédito</h3>
+    <p className="text-2xl font-bold">
+      {formatPrecio(totalesPorMetodo.credito)}
+    </p>
+  </div>
+  <div className="bg-cyan-50 p-4 rounded-lg">
+    <h3 className="font-semibold text-cyan-800">Transferencia</h3>
+    <p className="text-2xl font-bold">
+      {formatPrecio(totalesPorMetodo.transferencia || 0)}
+    </p>
+  </div>
+</div>
 
         <h3 className="font-semibold mb-2">Últimos 5 pedidos entregados</h3>
         <div className="overflow-x-auto">
