@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       lineCharacter: "-",
       options: { timeout: 5000 }
     }) as PrinterInstance;
+    
 
     // 2. Verificar conexión
     if (!(await printer.isPrinterConnected())) {
