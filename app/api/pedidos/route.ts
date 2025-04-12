@@ -294,10 +294,10 @@ export async function POST(request: Request) {
   }
 }
 
-// Endpoint PATCH para actualizar estados de pedidos
 export async function PATCH(request: Request) {
   let client;
   try {
+    // Validaciones iniciales (se mantienen igual)
     if (!request.headers.get('content-type')?.includes('application/json')) {
       return NextResponse.json(
         { success: false, error: 'Content-Type debe ser application/json' },
@@ -325,10 +325,31 @@ export async function PATCH(request: Request) {
     client = await pool.connect();
     await client.query('BEGIN');
 
+    // PASO NUEVO 1: Obtener el estado actual y cantidad de pollos del pedido
+    const pedidoActual = await client.query(
+      `SELECT estado, cantidad_pollo 
+       FROM pedidos 
+       WHERE id = $1 
+       FOR UPDATE`, // Bloquea el registro para evitar race conditions
+      [id]
+    );
+
+    if (pedidoActual.rowCount === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return NextResponse.json(
+        { success: false, error: 'Pedido no encontrado' },
+        { status: 404 }
+      );
+    }
+
+    const estadoAnterior = pedidoActual.rows[0].estado;
+    const cantidadPollo = parseFloat(pedidoActual.rows[0].cantidad_pollo);
+
+    // PASO 2: Actualizar el estado del pedido (tu código original)
     let query = 'UPDATE pedidos SET estado = $1';
     const params = [estado];
 
-    // Si el estado es "entregado", registrar hora de entrega real
     if (estado === 'entregado') {
       query += ', hora_entrega_real = NOW() AT TIME ZONE $2';
       params.push(TIMEZONE);
@@ -339,13 +360,15 @@ export async function PATCH(request: Request) {
 
     const result = await client.query(query, params);
 
-    if (result.rowCount === 0) {
-      await client.query('ROLLBACK');
-      client.release();
-      return NextResponse.json(
-        { success: false, error: 'Pedido no encontrado' },
-        { status: 404 }
+    // PASO NUEVO 3: Devolver pollos al stock si se cancela
+    if (estado === 'cancelado' && ['pendiente', 'preparando'].includes(estadoAnterior)) {
+      await client.query(
+        `UPDATE stock 
+         SET cantidad = cantidad + $1 
+         WHERE producto = 'pollo'`,
+        [cantidadPollo]
       );
+      console.log(`♻️ Devolviendo ${cantidadPollo} pollos al stock (Pedido ${id})`);
     }
 
     await client.query('COMMIT');
