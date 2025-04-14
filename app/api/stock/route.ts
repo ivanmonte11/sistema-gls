@@ -1,67 +1,93 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
-// Variable en memoria + última fecha de reset en BD
-let lastStockReset: Date | null = null;
+// Variable para evitar resets concurrentes
+let isResetting = false;
 
-// Función mejorada para resetear el stock con persistencia en BD
+// Función helper para comparar fechas
+function isSameDay(date1: Date, date2: Date): boolean {
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
+}
+
+// Función mejorada para resetear el stock
 async function resetStock() {
+  if (isResetting) return;
+  isResetting = true;
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // Resetear stock y registrar la fecha en una sola transacción
+    
+    // 1. Resetear stock
+    await client.query("UPDATE stock SET cantidad = 0 WHERE producto = 'pollo'");
+    
+    // 2. Registrar reset con hora de Buenos Aires
     await client.query(`
-      WITH reset AS (
-        UPDATE stock SET cantidad = 0 
-        WHERE producto = 'pollo' 
-        RETURNING NOW() as reset_time
-      )
       INSERT INTO reset_logs (fecha) 
-      SELECT reset_time FROM reset
+      VALUES (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')
     `);
+    
     await client.query("COMMIT");
-    console.log('✅ Stock reseteado a 0');
-    lastStockReset = new Date();
+    console.log('✅ Stock reseteado a 0 - Hora Buenos Aires:', new Date().toLocaleString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires'
+    }));
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error('Error al resetear stock:', error);
+    console.error('❌ Error al resetear stock:', error);
   } finally {
     client.release();
+    isResetting = false;
   }
 }
 
-// Verificación optimizada (solo hace reset si realmente es necesario)
+// Verificación optimizada
 async function checkDailyReset() {
-  const now = new Date();
   const client = await pool.connect();
-
   try {
-    // Obtiene la última fecha de reset desde la BD si no está en memoria
-    if (!lastStockReset) {
-      const res = await client.query(
-        "SELECT fecha FROM reset_logs ORDER BY fecha DESC LIMIT 1"
-      );
-      lastStockReset = res.rows[0]?.fecha || null;
-    }
+    // Obtener fecha actual en hora Argentina
+    const nowQuery = await client.query(
+      "SELECT NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires' as now_arg"
+    );
+    const now = new Date(nowQuery.rows[0].now_arg);
 
-    // Condiciones para resetear
-    if (
-      !lastStockReset ||
-      now.getDate() !== lastStockReset.getDate() ||
-      now.getMonth() !== lastStockReset.getMonth() ||
-      now.getFullYear() !== lastStockReset.getFullYear()
-    ) {
+    // Obtener último reset en hora Argentina
+    const lastResetQuery = await client.query(`
+      SELECT fecha AT TIME ZONE 'America/Argentina/Buenos_Aires' as fecha_arg
+      FROM reset_logs 
+      ORDER BY fecha DESC 
+      LIMIT 1
+    `);
+
+    const lastReset = lastResetQuery.rows[0]?.fecha_arg 
+      ? new Date(lastResetQuery.rows[0].fecha_arg) 
+      : null;
+
+    // Debug: Mostrar fechas importantes
+    console.log('⌚ Hora actual Buenos Aires:', now.toLocaleString('es-AR'));
+    console.log('⏱ Último reset:', lastReset?.toLocaleString('es-AR'));
+
+    // Condición para resetear
+    if (!lastReset || !isSameDay(now, lastReset)) {
+      console.log('🔄 Se requiere reset diario');
       await resetStock();
+    } else {
+      console.log('⏭ No se requiere reset (mismo día)');
     }
+  } catch (error) {
+    console.error('❌ Error en checkDailyReset:', error);
   } finally {
     client.release();
   }
 }
 
-// Handler GET optimizado
+// Handler GET
 export async function GET() {
   try {
-    await checkDailyReset(); // Verificación antes de responder
+    await checkDailyReset();
     
     const client = await pool.connect();
     const res = await client.query(
@@ -81,10 +107,10 @@ export async function GET() {
   }
 }
 
-// Handler POST optimizado
+// Handler POST
 export async function POST(request: Request) {
   try {
-    await checkDailyReset(); // Verificación antes de actualizar
+    await checkDailyReset();
     
     const { cantidad } = await request.json();
     const client = await pool.connect();
