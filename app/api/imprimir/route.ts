@@ -7,41 +7,38 @@ type PrinterInstance = InstanceType<typeof Printer> & {
   close(): Promise<void>;
 };
 
-// Configuración mejorada para Epson por red
 export async function POST(request: Request) {
   let printer: PrinterInstance | undefined;
-  
+
   try {
     const pedido = await request.json();
 
-    // 1. Configuración mejorada de la impresora
+    // Configuración de la impresora (sin encoding ni charset inválido)
     printer = new Printer({
       type: types.EPSON,
       interface: process.env.PRINTER_IP || 'tcp://192.168.1.100',
-      characterSet: 'PC860_PORTUGUESE', // Para caracteres en español
       removeSpecialCharacters: false,
       lineCharacter: "-",
-      options: { 
-        timeout: 3000, // Timeout más corto
-        encoding: 'UTF-8' // Asegura caracteres especiales
+      options: {
+        timeout: 3000
       }
     }) as PrinterInstance;
 
-    // 2. Verificación de conexión con reintentos
+    // Verificar conexión con 3 intentos
     let connected = false;
     for (let i = 0; i < 3; i++) {
       if (await printer.isPrinterConnected()) {
         connected = true;
         break;
       }
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Espera 1s entre intentos
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     if (!connected) {
       throw new Error('No se pudo conectar a la impresora después de 3 intentos');
     }
 
-    // 3. Construcción del ticket (optimizado)
+    // Construcción del ticket
     printer.alignCenter();
     printer.bold(true);
     printer.println("GRANJA LA COLONIA");
@@ -50,9 +47,9 @@ export async function POST(request: Request) {
     printer.println("Tel: 3856146824");
     printer.drawLine();
 
-    // [...] (resto del contenido del ticket igual al que tienes)
+    // Aquí agregas los datos del pedido...
 
-    // 4. Enviar a imprimir con manejo de errores
+    // Ejecutar impresión
     try {
       const success = await printer.execute();
       if (!success) {
@@ -62,7 +59,7 @@ export async function POST(request: Request) {
       throw new Error(`Error al enviar a imprimir: ${printError instanceof Error ? printError.message : 'Error desconocido'}`);
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       message: 'Ticket impreso correctamente'
     });
@@ -70,9 +67,9 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     console.error('Error en impresión:', error);
-    
+
     return NextResponse.json(
-      { 
+      {
         success: false,
         error: 'Error al imprimir ticket',
         details: process.env.NODE_ENV === 'development' ? errorMessage : null
