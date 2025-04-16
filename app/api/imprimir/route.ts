@@ -47,7 +47,31 @@ export async function POST(request: Request) {
     printer.println("Tel: 3856146824");
     printer.drawLine();
 
-    // Aquí agregas los datos del pedido...
+    printer.alignLeft();
+printer.println(`Pedido Nº: ${pedido.numero_pedido}`);
+printer.println(`Cliente: ${pedido.nombre_cliente}`);
+if (pedido.telefono_cliente) printer.println(`Teléfono: ${pedido.telefono_cliente}`);
+if (pedido.tipo_entrega === 'envio') {
+  printer.println("Tipo de entrega: Envío");
+  printer.println(`Zona: ${pedido.tipo_envio}`);
+  if (pedido.direccion) printer.println(`Dirección: ${pedido.direccion}`);
+} else {
+  printer.println("Tipo de entrega: Retira por local");
+}
+printer.drawLine();
+printer.println(`Cantidad de pollos: ${pedido.cantidad_pollo}`);
+if (pedido.con_papas) {
+  printer.println(`Con papas: Sí (${pedido.cantidad_papas})`);
+}
+if (pedido.con_chimichurri) {
+  printer.println("Con chimichurri: Sí");
+}
+printer.drawLine();
+printer.println(`Método de pago: ${pedido.metodo_pago}`);
+printer.println(`Total: $${pedido.precio_total}`);
+printer.drawLine();
+printer.println(`Fecha: ${pedido.fecha_pedido}`);
+
 
     // Ejecutar impresión
     try {
