@@ -400,3 +400,219 @@ export async function PATCH(request: Request) {
   }
 }
 
+// Endpoint PUT para editar pedidos existentes
+export async function PUT(request: Request) {
+  let client;
+  try {
+    // Validaciones básicas
+    if (!request.headers.get('content-type')?.includes('application/json')) {
+      return NextResponse.json(
+        { success: false, error: 'Content-Type debe ser application/json' },
+        { status: 400 }
+      );
+    }
+
+    const data = await request.json();
+    
+    // Campos requeridos para edición
+    if (!data.id) {
+      return NextResponse.json(
+        { success: false, error: 'Se requiere el ID del pedido' },
+        { status: 400 }
+      );
+    }
+
+    const requiredFields = [
+      'nombre', 'tipoEntrega', 'metodoPago', 
+      'cantidadPollo', 'precioUnitario',
+      'horaEntrega'
+    ];
+    const missingFields = requiredFields.filter(field => !data[field]);
+    
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Faltan campos requeridos',
+          missingFields 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validar cantidad de pollo
+    if (data.cantidadPollo <= 0 || data.cantidadPollo % 0.5 !== 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'La cantidad debe ser mayor a 0 y múltiplo de 0.5 (ej: 0.5, 1, 1.5)' 
+        },
+        { status: 400 }
+      );
+    }
+
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    // 1. Obtener el pedido actual para comparar cantidades
+    const pedidoActual = await client.query(
+      `SELECT cantidad_pollo, estado FROM pedidos WHERE id = $1 FOR UPDATE`,
+      [data.id]
+    );
+
+    if (pedidoActual.rowCount === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return NextResponse.json(
+        { success: false, error: 'Pedido no encontrado' },
+        { status: 404 }
+      );
+    }
+
+    const cantidadAnterior = parseFloat(pedidoActual.rows[0].cantidad_pollo);
+    const estadoActual = pedidoActual.rows[0].estado;
+
+    // No permitir editar pedidos entregados o cancelados
+    if (['entregado', 'cancelado'].includes(estadoActual)) {
+      await client.query('ROLLBACK');
+      client.release();
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `No se puede editar un pedido ${estadoActual}` 
+        },
+        { status: 400 }
+      );
+    }
+
+    // 2. Verificar stock (solo si cambió la cantidad)
+    const diferenciaCantidad = data.cantidadPollo - cantidadAnterior;
+    
+    if (diferenciaCantidad > 0) {
+      const stockResult = await client.query(
+        'SELECT cantidad FROM stock WHERE producto = $1',
+        ['pollo']
+      );
+      const stockDisponible = parseFloat(stockResult.rows[0]?.cantidad) || 0;
+      
+      if (stockDisponible < diferenciaCantidad) {
+        await client.query('ROLLBACK');
+        client.release();
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Stock insuficiente para actualizar. Disponible: ${stockDisponible}, Necesario: ${diferenciaCantidad}` 
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 3. Cálculo del nuevo precio total (similar a POST)
+    const precioUnitario = Number(data.precioUnitario);
+    let precioTotal = 0;
+    const cantidadEntera = Math.floor(data.cantidadPollo);
+    const tieneMedioPollo = data.cantidadPollo % 1 !== 0;
+
+    precioTotal += cantidadEntera * precioUnitario;
+
+    if (tieneMedioPollo) {
+      precioTotal += (precioUnitario / 2) + 1000;
+    }
+
+    if (data.tipoEntrega === 'envio') {
+      switch(data.tipoEnvio) {
+        case 'cercano': precioTotal += 1500; break;
+        case 'lejano': precioTotal += 2500; break;
+        case 'la_banda': precioTotal += 3000; break;
+      }
+    }
+
+    if (data.conPapas && data.cantidadPapas > 0) {
+      precioTotal += data.cantidadPapas * 4000;
+    }
+
+    // 4. Actualizar el pedido
+    const result = await client.query(
+      `UPDATE pedidos SET
+        nombre_cliente = $1,
+        telefono_cliente = $2,
+        tipo_entrega = $3,
+        tipo_envio = $4,
+        direccion = $5,
+        metodo_pago = $6,
+        con_chimichurri = $7,
+        con_papas = $8,
+        cantidad_papas = $9,
+        cantidad_pollo = $10,
+        precio_unitario = $11,
+        precio_total = $12,
+        hora_entrega_solicitada = $13,
+        fecha_actualizacion = NOW() AT TIME ZONE $14
+      WHERE id = $15
+      RETURNING *`,
+      [
+        data.nombre,
+        data.telefono || null,
+        data.tipoEntrega,
+        data.tipoEntrega === 'envio' ? data.tipoEnvio : null,
+        data.tipoEntrega === 'envio' ? data.direccion : null,
+        data.metodoPago,
+        data.conChimichurri || false,
+        data.conPapas || false,
+        data.conPapas ? (data.cantidadPapas || 0) : 0,
+        data.cantidadPollo,
+        precioUnitario,
+        precioTotal,
+        data.horaEntrega,
+        TIMEZONE,
+        data.id
+      ]
+    );
+
+    // 5. Ajustar stock según la diferencia
+    if (diferenciaCantidad !== 0) {
+      await client.query(
+        'UPDATE stock SET cantidad = cantidad - $1 WHERE producto = $2',
+        [diferenciaCantidad, 'pollo']
+      );
+    }
+
+    await client.query('COMMIT');
+    client.release();
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Pedido actualizado con éxito',
+      data: result.rows[0],
+      cambios: {
+        cantidad: {
+          anterior: cantidadAnterior,
+          nuevo: data.cantidadPollo,
+          diferencia: diferenciaCantidad
+        },
+        precio: {
+          nuevoTotal: precioTotal
+        }
+      }
+    });
+    
+  } catch (error) {
+    if (client) {
+      await client.query('ROLLBACK').catch(e => console.error('Error en ROLLBACK:', e));
+      client.release();
+    }
+    
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    console.error('Error en PUT /api/pedidos:', errorMessage);
+
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Error al actualizar el pedido',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : null
+      },
+      { status: 500 }
+    );
+  }
+}
