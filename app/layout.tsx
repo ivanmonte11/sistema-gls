@@ -55,10 +55,10 @@ export default function RootLayout({
           {/* Footer */}
           <footer className="bg-primary text-white p-4 mt-auto">
             <div className="container mx-auto text-center">
-              <p>© {new Date().getFullYear()} Todos los derechos reservados | Granja la Colonia.</p>
+              <p>Granja la Colonia.</p>
             </div>
             <div className="container mx-auto text-center">
-              <p>Desarrollado por MonteStack.</p>
+              <p>© {new Date().getFullYear()} Desarrollado por MonteStack | Todos los derechos reservados</p>
             </div>
           </footer>
         </div>

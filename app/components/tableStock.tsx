@@ -1,10 +1,33 @@
+'use client';
+import { useEffect, useState } from 'react';
+
 interface TablaStockProps {
   stock: number;
-  precio?: number; // Hacerlo opcional
+  precio?: number; // Aún puede pasarse manualmente
 }
 
-export default function TablaStock({ stock, precio = 20000 }: TablaStockProps) {
-  // Función para formatear números con puntos de miles
+export default function TablaStock({ stock, precio }: TablaStockProps) {
+  const [precioFinal, setPrecioFinal] = useState<number | undefined>(precio);
+
+  useEffect(() => {
+    // Solo buscar si no vino desde props
+    if (precio === undefined) {
+      fetch('/api/precios')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            const pollo = data.data.find((item: any) => item.item_key === 'pollo_precio');
+            if (pollo) {
+              setPrecioFinal(pollo.item_value);
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching pollo_precio:', err);
+        });
+    }
+  }, [precio]);
+
   const formatNumber = (num: number) => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
@@ -26,10 +49,10 @@ export default function TablaStock({ stock, precio = 20000 }: TablaStockProps) {
               <td className="p-3 text-gray-600">Pollo</td>
               <td className="p-3 text-gray-800 font-medium">{formatNumber(stock)}</td>
               <td className="p-3 text-gray-800 font-medium">
-                {typeof precio === 'number' ? (
-                  <span className="text-green-600">${formatNumber(precio)}</span>
+                {typeof precioFinal === 'number' ? (
+                  <span className="text-green-600">${formatNumber(precioFinal)}</span>
                 ) : (
-                  <span className="text-gray-400">N/A</span>
+                  <span className="text-gray-400">Cargando...</span>
                 )}
               </td>
             </tr>

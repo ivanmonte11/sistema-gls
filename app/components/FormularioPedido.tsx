@@ -25,6 +25,14 @@ type StockData = {
   precio: number;
 };
 
+type PreciosConfig = {
+  medio_pollo_recargo: number;
+  papas_precio: number;
+  envio_cercano: number;
+  envio_lejano: number;
+  envio_la_banda: number;
+};
+
 export default function FormularioPedido() {
   // Estados del formulario
   const [nombre, setNombre] = useState<string>('');
@@ -43,11 +51,19 @@ export default function FormularioPedido() {
   const [precioFinal, setPrecioFinal] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [stockData, setStockData] = useState<StockData>({ cantidad: 0, precio: 20000 });
-  const [lastResetDate, setLastResetDate] = useState<string>('');
+  const [preciosConfig, setPreciosConfig] = useState<PreciosConfig>({
+    medio_pollo_recargo: 1000,
+    papas_precio: 4000,
+    envio_cercano: 1500,
+    envio_lejano: 2500,
+    envio_la_banda: 3000
+  });
 
   useEffect(() => {
     obtenerStock();
+    obtenerPrecios();
     checkAndResetSequence();
+    
     // Establecer hora por defecto (1 hora en el futuro)
     const ahora = new Date();
     ahora.setHours(ahora.getHours() + 1);
@@ -62,38 +78,7 @@ export default function FormularioPedido() {
     } else {
       setPrecioFinal(0);
     }
-  }, [cantidadPollo, tipoEntrega, tipoEnvio, conPapas, cantidadPapas]);
-
-  // FUNCIÓN ACTUALIZADA - NUEVO CÁLCULO
-  const calcularPrecio = () => {
-    let total = 0;
-    const cantidadEntera = Math.floor(cantidadPollo as number);
-    const tieneMedioPollo = (cantidadPollo as number) % 1 !== 0;
-
-    // 1. Pollos enteros
-    total += cantidadEntera * precioUnitario;
-
-    // 2. Medio pollo (mitad de precio + $1000 adicionales)
-    if (tieneMedioPollo) {
-      total += (precioUnitario / 2) + 1000;
-    }
-
-    // 3. Costo de envío
-    if (tipoEntrega === 'envio') {
-      switch(tipoEnvio) {
-        case 'cercano': total += 1500; break;
-        case 'lejano': total += 2500; break;
-        case 'la_banda': total += 3000; break;
-      }
-    }
-
-    // 4. Papas extras
-    if (conPapas && cantidadPapas > 0) {
-      total += cantidadPapas * 4000;
-    }
-
-    setPrecioFinal(total);
-  };
+  }, [cantidadPollo, tipoEntrega, tipoEnvio, conPapas, cantidadPapas, preciosConfig]);
 
   const obtenerStock = async () => {
     try {
@@ -106,6 +91,58 @@ export default function FormularioPedido() {
     } catch (error) {
       console.error('Error obteniendo stock:', error);
     }
+  };
+
+  const obtenerPrecios = async () => {
+    try {
+      const res = await fetch('/api/precios');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          const preciosMap = data.data.reduce((acc: any, item: any) => {
+            acc[item.item_key] = parseFloat(item.item_value);
+            return acc;
+          }, {});
+          setPreciosConfig(prev => ({
+            ...prev,
+            ...preciosMap
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error obteniendo precios:', error);
+    }
+  };
+
+  const calcularPrecio = () => {
+    let total = 0;
+    const cantidadEntera = Math.floor(cantidadPollo as number);
+    const tieneMedioPollo = (cantidadPollo as number) % 1 !== 0;
+
+    // 1. Pollos enteros
+    total += cantidadEntera * precioUnitario;
+
+    // 2. Medio pollo (mitad de precio + recargo dinámico)
+    if (tieneMedioPollo) {
+      total += (precioUnitario / 2) + preciosConfig.medio_pollo_recargo;
+    }
+
+    // 3. Costo de envío dinámico
+    if (tipoEntrega === 'envio') {
+      switch(tipoEnvio) {
+        case 'cercano': total += preciosConfig.envio_cercano; break;
+        case 'lejano': total += preciosConfig.envio_lejano; break;
+        case 'la_banda': total += preciosConfig.envio_la_banda; break;
+      }
+    }
+
+    // 4. Papas extras con precio dinámico
+    if (conPapas && cantidadPapas > 0) {
+      total += cantidadPapas * preciosConfig.papas_precio;
+    }
+
+    // Redondeamos a números enteros para evitar decimales
+    setPrecioFinal(Math.round(total));
   };
 
   const checkAndResetSequence = () => {
@@ -321,7 +358,7 @@ export default function FormularioPedido() {
                       checked={tipoEnvio === 'cercano'}
                       onChange={() => setTipoEnvio('cercano')}
                     />
-                    <span>Cercano (+${formatNumber(1500)})</span>
+                    <span>Cercano (+${formatNumber(preciosConfig.envio_cercano)})</span>
                   </label>
                   <label className="flex items-center space-x-2 p-2 border rounded">
                     <input
@@ -329,7 +366,7 @@ export default function FormularioPedido() {
                       checked={tipoEnvio === 'lejano'}
                       onChange={() => setTipoEnvio('lejano')}
                     />
-                    <span>Lejano (+${formatNumber(2500)})</span>
+                    <span>Lejano (+${formatNumber(preciosConfig.envio_lejano)})</span>
                   </label>
                   <label className="flex items-center space-x-2 p-2 border rounded">
                     <input
@@ -337,7 +374,7 @@ export default function FormularioPedido() {
                       checked={tipoEnvio === 'la_banda'}
                       onChange={() => setTipoEnvio('la_banda')}
                     />
-                    <span>La Banda (+${formatNumber(3000)})</span>
+                    <span>La Banda (+${formatNumber(preciosConfig.envio_la_banda)})</span>
                   </label>
                   <label className="flex items-center space-x-2 p-2 border rounded">
                     <input
@@ -444,15 +481,15 @@ export default function FormularioPedido() {
             </div>
             {tipoEntrega === 'envio' && (
               <div className="text-sm text-gray-600 mt-1">
-                {tipoEnvio === 'cercano' && `Incluye envío cercano: $${formatNumber(1500)}`}
-                {tipoEnvio === 'lejano' && `Incluye costo de envío lejano: $${formatNumber(2500)}`}
-                {tipoEnvio === 'la_banda' && `Incluye costo de envío a La Banda: $${formatNumber(3000)}`}
+                {tipoEnvio === 'cercano' && `Incluye envío cercano: $${formatNumber(preciosConfig.envio_cercano)}`}
+                {tipoEnvio === 'lejano' && `Incluye costo de envío lejano: $${formatNumber(preciosConfig.envio_lejano)}`}
+                {tipoEnvio === 'la_banda' && `Incluye costo de envío a La Banda: $${formatNumber(preciosConfig.envio_la_banda)}`}
                 {tipoEnvio === 'gratis' && 'Incluye envío gratis'}
               </div>
             )}
             {conPapas && cantidadPapas > 0 && (
               <div className="text-sm text-gray-600 mt-1">
-                {cantidadPapas} porción(es) de papas: +${formatNumber(cantidadPapas * 4000)}
+                {cantidadPapas} porción(es) de papas: +${formatNumber(cantidadPapas * preciosConfig.papas_precio)}
               </div>
             )}
           </div>

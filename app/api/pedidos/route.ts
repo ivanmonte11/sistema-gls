@@ -3,6 +3,16 @@ import pool from '@/lib/db';
 
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
 
+// Función para obtener precios desde la base de datos
+async function getPrecios(client: any) {
+  const res = await client.query('SELECT item_key, item_value FROM precio_config');
+  const precios: Record<string, number> = {};
+  res.rows.forEach((row: any) => {
+    precios[row.item_key] = parseFloat(row.item_value);
+  });
+  return precios;
+}
+
 // Función para generar número de pedido único
 async function generarNumeroPedido(client: any): Promise<string> {
   const ahora = new Date();
@@ -60,46 +70,73 @@ async function generarNumeroPedido(client: any): Promise<string> {
   }
 }
 
+// Función para calcular el precio total basado en los precios dinámicos
+async function calcularPrecioTotal(client: any, data: any) {
+  const precios = await getPrecios(client);
+  const precioUnitario = Number(data.precioUnitario);
+  let precioTotal = 0;
+  const cantidadEntera = Math.floor(data.cantidadPollo);
+  const tieneMedioPollo = data.cantidadPollo % 1 !== 0;
+
+  // Precio base por pollos enteros
+  precioTotal += cantidadEntera * precioUnitario;
+
+  // Recargo por medio pollo
+  if (tieneMedioPollo) {
+    precioTotal += (precioUnitario / 2) + precios.medio_pollo_recargo;
+  }
+
+  // Costo de envío
+  if (data.tipoEntrega === 'envio') {
+    switch(data.tipoEnvio) {
+      case 'cercano': 
+        precioTotal += precios.envio_cercano; 
+        break;
+      case 'lejano': 
+        precioTotal += precios.envio_lejano; 
+        break;
+      case 'la_banda': 
+        precioTotal += precios.envio_la_banda; 
+        break;
+    }
+  }
+
+  // Costo de papas
+  if (data.conPapas && data.cantidadPapas > 0) {
+    precioTotal += data.cantidadPapas * precios.papas_precio;
+  }
+
+  return precioTotal;
+}
+
 // Endpoint GET para obtener pedidos
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const limit = searchParams.get('limit') || '100';
-  const estado = searchParams.get('estado');
-  const ultimo = searchParams.get('ultimo') === 'true';
-  const fecha = searchParams.get('fecha') || 'CURRENT_DATE';
+  const fecha = searchParams.get('fecha');
   
   try {
     const client = await pool.connect();
-    let query = '';
+    
+    let query = `SELECT * FROM pedidos`;
     const params = [];
-
-    if (ultimo) {
-      query = `SELECT * FROM pedidos`;
-      if (estado) {
-        query += ' WHERE estado = $1';
-        params.push(estado);
-      }
-      query += ' ORDER BY fecha_pedido DESC, hora_pedido DESC LIMIT 1';
-    } else {
-      query = `SELECT * FROM pedidos WHERE ${estado ? 'estado = $1 AND' : ''} fecha_pedido = ${fecha === 'CURRENT_DATE' ? 'CURRENT_DATE' : '$1'}`;
-      if (estado) {
-        params.push(estado);
-        if (fecha !== 'CURRENT_DATE') {
-          params.push(fecha);
-        }
-      } else if (fecha !== 'CURRENT_DATE') {
-        params.push(fecha);
-      }
-      query += ` ORDER BY 
-        CASE 
-          WHEN hora_entrega_solicitada IS NULL THEN 1
-          ELSE 0
-        END,
-        hora_entrega_solicitada ASC,
-        hora_pedido ASC
-      LIMIT $${params.length + 1}`;
-      params.push(limit);
+    
+    if (fecha) {
+      query += ` WHERE fecha_pedido = $1`;
+      params.push(fecha);
     }
+    
+    query += ` ORDER BY 
+      CASE 
+        WHEN estado = 'entregado' THEN 1
+        WHEN estado = 'cancelado' THEN 2
+        ELSE 0
+      END,
+      CASE 
+        WHEN hora_entrega_solicitada IS NULL THEN 1
+        ELSE 0
+      END,
+      hora_entrega_solicitada ASC,
+      hora_pedido ASC`;
 
     const result = await client.query(query, params);
     client.release();
@@ -184,29 +221,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Cálculo del precio total
+    // Calcular precio total con precios dinámicos
+    const precioTotal = await calcularPrecioTotal(client, data);
     const precioUnitario = Number(data.precioUnitario);
-    let precioTotal = 0;
-    const cantidadEntera = Math.floor(data.cantidadPollo);
-    const tieneMedioPollo = data.cantidadPollo % 1 !== 0;
-
-    precioTotal += cantidadEntera * precioUnitario;
-
-    if (tieneMedioPollo) {
-      precioTotal += (precioUnitario / 2) + 1000;
-    }
-
-    if (data.tipoEntrega === 'envio') {
-      switch(data.tipoEnvio) {
-        case 'cercano': precioTotal += 1500; break;
-        case 'lejano': precioTotal += 2500; break;
-        case 'la_banda': precioTotal += 3000; break;
-      }
-    }
-
-    if (data.conPapas && data.cantidadPapas > 0) {
-      precioTotal += data.cantidadPapas * 4000;
-    }
 
     const numeroPedido = await generarNumeroPedido(client);
     await client.query('BEGIN');
@@ -294,10 +311,10 @@ export async function POST(request: Request) {
   }
 }
 
+// Endpoint PATCH para actualizar estado de pedidos
 export async function PATCH(request: Request) {
   let client;
   try {
-    // Validaciones iniciales (se mantienen igual)
     if (!request.headers.get('content-type')?.includes('application/json')) {
       return NextResponse.json(
         { success: false, error: 'Content-Type debe ser application/json' },
@@ -325,12 +342,12 @@ export async function PATCH(request: Request) {
     client = await pool.connect();
     await client.query('BEGIN');
 
-    // PASO NUEVO 1: Obtener el estado actual y cantidad de pollos del pedido
+    // Obtener el estado actual y cantidad de pollos del pedido
     const pedidoActual = await client.query(
       `SELECT estado, cantidad_pollo 
        FROM pedidos 
        WHERE id = $1 
-       FOR UPDATE`, // Bloquea el registro para evitar race conditions
+       FOR UPDATE`,
       [id]
     );
 
@@ -346,7 +363,7 @@ export async function PATCH(request: Request) {
     const estadoAnterior = pedidoActual.rows[0].estado;
     const cantidadPollo = parseFloat(pedidoActual.rows[0].cantidad_pollo);
 
-    // PASO 2: Actualizar el estado del pedido (tu código original)
+    // Actualizar el estado del pedido
     let query = 'UPDATE pedidos SET estado = $1';
     const params = [estado];
 
@@ -360,7 +377,7 @@ export async function PATCH(request: Request) {
 
     const result = await client.query(query, params);
 
-    // PASO NUEVO 3: Devolver pollos al stock si se cancela
+    // Devolver pollos al stock si se cancela
     if (estado === 'cancelado' && ['pendiente', 'preparando'].includes(estadoAnterior)) {
       await client.query(
         `UPDATE stock 
@@ -404,7 +421,6 @@ export async function PATCH(request: Request) {
 export async function PUT(request: Request) {
   let client;
   try {
-    // Validaciones básicas
     if (!request.headers.get('content-type')?.includes('application/json')) {
       return NextResponse.json(
         { success: false, error: 'Content-Type debe ser application/json' },
@@ -414,7 +430,6 @@ export async function PUT(request: Request) {
 
     const data = await request.json();
     
-    // Campos requeridos para edición
     if (!data.id) {
       return NextResponse.json(
         { success: false, error: 'Se requiere el ID del pedido' },
@@ -454,7 +469,7 @@ export async function PUT(request: Request) {
     client = await pool.connect();
     await client.query('BEGIN');
 
-    // 1. Obtener el pedido actual para comparar cantidades
+    // Obtener el pedido actual para comparar cantidades
     const pedidoActual = await client.query(
       `SELECT cantidad_pollo, estado FROM pedidos WHERE id = $1 FOR UPDATE`,
       [data.id]
@@ -485,7 +500,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    // 2. Verificar stock (solo si cambió la cantidad)
+    // Verificar stock (solo si cambió la cantidad)
     const diferenciaCantidad = data.cantidadPollo - cantidadAnterior;
     
     if (diferenciaCantidad > 0) {
@@ -508,31 +523,11 @@ export async function PUT(request: Request) {
       }
     }
 
-    // 3. Cálculo del nuevo precio total (similar a POST)
+    // Calcular nuevo precio total con precios dinámicos
+    const precioTotal = await calcularPrecioTotal(client, data);
     const precioUnitario = Number(data.precioUnitario);
-    let precioTotal = 0;
-    const cantidadEntera = Math.floor(data.cantidadPollo);
-    const tieneMedioPollo = data.cantidadPollo % 1 !== 0;
 
-    precioTotal += cantidadEntera * precioUnitario;
-
-    if (tieneMedioPollo) {
-      precioTotal += (precioUnitario / 2) + 1000;
-    }
-
-    if (data.tipoEntrega === 'envio') {
-      switch(data.tipoEnvio) {
-        case 'cercano': precioTotal += 1500; break;
-        case 'lejano': precioTotal += 2500; break;
-        case 'la_banda': precioTotal += 3000; break;
-      }
-    }
-
-    if (data.conPapas && data.cantidadPapas > 0) {
-      precioTotal += data.cantidadPapas * 4000;
-    }
-
-    // 4. Actualizar el pedido
+    // Actualizar el pedido
     const result = await client.query(
       `UPDATE pedidos SET
         nombre_cliente = $1,
@@ -570,7 +565,7 @@ export async function PUT(request: Request) {
       ]
     );
 
-    // 5. Ajustar stock según la diferencia
+    // Ajustar stock según la diferencia
     if (diferenciaCantidad !== 0) {
       await client.query(
         'UPDATE stock SET cantidad = cantidad - $1 WHERE producto = $2',

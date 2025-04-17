@@ -125,6 +125,7 @@ export default function Home() {
         */}
 
         {/* Tarjeta 6: Configuración */}
+        <Link href="dashboard/configuraciones">
         <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
           <div className="text-indigo-600 mb-4">
             <svg
@@ -151,6 +152,7 @@ export default function Home() {
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Configuración</h2>
           <p className="text-gray-600">Ajusta las preferencias del sistema.</p>
         </div>
+        </Link>
       </div>
     </div>
   );

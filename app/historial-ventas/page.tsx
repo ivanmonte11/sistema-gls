@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { TicketPedido } from '../components/TicketPedido';
+import { format, subDays, addDays, isSameDay, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Pedido {
   id: number;
@@ -44,15 +46,17 @@ export default function HistorialVentas() {
   const [activeTab, setActiveTab] = useState<'todos' | 'entregados'>('todos');
   const [pedidoAEditar, setPedidoAEditar] = useState<Pedido | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<Date>(new Date());
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        const fechaFormateada = format(fechaSeleccionada, 'yyyy-MM-dd');
         
         const [pedidosResponse, estadisticasResponse] = await Promise.all([
-          fetch('/api/pedidos?limit=100'),
-          fetch('/api/pedidos/estadisticas')
+          fetch(`/api/pedidos?fecha=${fechaFormateada}`),
+          fetch(`/api/pedidos/estadisticas?fecha=${fechaFormateada}`)
         ]);
 
         if (!pedidosResponse.ok || !estadisticasResponse.ok) {
@@ -93,7 +97,15 @@ export default function HistorialVentas() {
     };
 
     fetchData();
-  }, []);
+  }, [fechaSeleccionada]);
+
+  const cambiarDia = (dias: number) => {
+    setFechaSeleccionada(addDays(fechaSeleccionada, dias));
+  };
+
+  const irADiaActual = () => {
+    setFechaSeleccionada(new Date());
+  };
 
   const calcularTotalesPorMetodo = () => {
     const totales = {
@@ -150,7 +162,7 @@ export default function HistorialVentas() {
         const pedidoActualizado = pedidos.find(p => p.id === id);
         if (pedidoActualizado) {
           setPedidosEntregados([{...pedidoActualizado, estado: 'entregado'}, ...pedidosEntregados]);
-          const statsResponse = await fetch('/api/pedidos/estadisticas');
+          const statsResponse = await fetch(`/api/pedidos/estadisticas?fecha=${format(fechaSeleccionada, 'yyyy-MM-dd')}`);
           const statsData = await statsResponse.json();
           if (statsResponse.ok && statsData.success) {
             setEstadisticas(statsData.data.estadisticas);
@@ -213,7 +225,7 @@ export default function HistorialVentas() {
       }
   
       // Recargar estadísticas
-      const statsResponse = await fetch('/api/pedidos/estadisticas');
+      const statsResponse = await fetch(`/api/pedidos/estadisticas?fecha=${format(fechaSeleccionada, 'yyyy-MM-dd')}`);
       const statsData = await statsResponse.json();
       if (statsResponse.ok && statsData.success) {
         setEstadisticas(statsData.data.estadisticas);
@@ -230,7 +242,6 @@ export default function HistorialVentas() {
     }
   };
 
-  // Funciones de formato (se mantienen igual)
   const formatMetodoPago = (metodo: string) => {
     const metodos: Record<string, string> = {
       efectivo: 'Efectivo',
@@ -280,6 +291,38 @@ export default function HistorialVentas() {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6">Historial de Ventas</h1>
       
+      {/* Selector de fecha */}
+      <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-lg shadow">
+        <button 
+          onClick={() => cambiarDia(-1)}
+          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+        >
+          &larr; Día anterior
+        </button>
+        
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">
+            {format(fechaSeleccionada, 'EEEE, d MMMM yyyy', { locale: es })}
+          </h2>
+          {!isSameDay(fechaSeleccionada, new Date()) && (
+            <button 
+              onClick={irADiaActual}
+              className="text-sm text-blue-600 hover:underline mt-1"
+            >
+              Volver al día actual
+            </button>
+          )}
+        </div>
+        
+        <button 
+          onClick={() => cambiarDia(1)}
+          disabled={isSameDay(fechaSeleccionada, new Date())}
+          className={`px-4 py-2 rounded ${isSameDay(fechaSeleccionada, new Date()) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-200 hover:bg-gray-300'}`}
+        >
+          Día siguiente &rarr;
+        </button>
+      </div>
+
       <div className="flex border-b mb-4">
         <button
           className={`py-2 px-4 font-medium ${activeTab === 'todos' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
@@ -601,9 +644,9 @@ export default function HistorialVentas() {
         </div>
       )}
 
-      {/* Resumen de Estadísticas (se mantiene igual) */}
+      {/* Resumen de Estadísticas */}
       <div className="mt-8 bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-bold mb-4">Resumen de Entregas</h2>
+        <h2 className="text-xl font-bold mb-4">Resumen del Día</h2>
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
           <div className="bg-green-50 p-4 rounded-lg">
             <h3 className="font-semibold text-green-800">Total Entregados</h3>
@@ -641,7 +684,7 @@ export default function HistorialVentas() {
           </div>
         </div>
 
-        <h3 className="font-semibold mb-2">Últimos 5 pedidos entregados</h3>
+        <h3 className="font-semibold mb-2">Todos los pedidos del día</h3>
         <div className="overflow-x-auto">
           <table className="min-w-full bg-green-50 rounded-lg overflow-hidden">
             <thead className="bg-green-100">
@@ -654,7 +697,7 @@ export default function HistorialVentas() {
               </tr>
             </thead>
             <tbody>
-              {pedidosEntregados.slice(0, 5).map((pedido) => (
+              {pedidosEntregados.map((pedido) => (
                 <tr key={`entregado-${pedido.id}`} className="border-b hover:bg-green-100">
                   <td className="px-4 py-3">{formatNumeroPedido(pedido.numero_pedido)}</td>
                   <td className="px-4 py-3">{pedido.nombre_cliente}</td>
