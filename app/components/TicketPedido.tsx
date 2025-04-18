@@ -56,7 +56,8 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
     setError(null);
     
     try {
-      const response = await fetch('/api/imprimir', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_IMPRESORA_API}/api/imprimir`, {
+
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

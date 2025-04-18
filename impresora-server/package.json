@@ -1,0 +1,15 @@
+{
+    "name": "impresora-server",
+    "version": "1.0.0",
+    "description": "Servidor de impresión local",
+    "main": "impresora-server/index.js",
+    "bin": "./impresora-server/index.js",
+    "scripts": {
+      "start": "node impresora-server/index.js"
+    },
+    "dependencies": {
+      "express": "^4.18.2",
+      "dotenv": "^16.3.1"
+    }
+  }
+  
