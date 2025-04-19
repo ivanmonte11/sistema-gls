@@ -25,7 +25,6 @@ interface Pedido {
 export function TicketPedido({ pedido }: { pedido: Pedido }) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [impreso, setImpreso] = useState(false);
 
   const formatPrecio = (precio: number | string): string => {
     const numero = typeof precio === 'string' ? parseFloat(precio) : precio;
@@ -75,10 +74,6 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
       if (!result.success) {
         throw new Error(result.message || 'Error en la impresión');
       }
-
-      // Marcar como impreso si fue exitoso
-      setImpreso(true);
-
     } catch (err) {
       console.error('Error al imprimir:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido al imprimir');
@@ -130,10 +125,10 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
             <div class="divider"></div>
             <div class="header">PEDIDO #${pedido.numero_pedido}</div>
             <p><strong>Fecha del pedido:</strong> ${new Date(pedido.fecha_pedido).toLocaleDateString('es-AR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric'
-            })}</p>
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      })}</p>
             
             <div class="hora-destacada">
               <div>🕒 HORA DE ENTREGA 🕒</div>
@@ -144,11 +139,11 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
             <p><strong>Cliente:</strong> ${pedido.nombre_cliente}</p>
             ${pedido.telefono_cliente ? `<p><strong>Teléfono:</strong> ${pedido.telefono_cliente}</p>` : ''}
             <p><strong>Entrega:</strong> ${pedido.tipo_entrega === 'envio'
-              ? `Envío (${formatTipoEnvio(pedido.tipo_envio)})`
-              : 'Retira en local'}</p>
+          ? `Envío (${formatTipoEnvio(pedido.tipo_envio)})`
+          : 'Retira en local'}</p>
             ${pedido.tipo_entrega === 'envio' && pedido.direccion
-              ? `<p><strong>Dirección:</strong> ${pedido.direccion}</p>`
-              : ''}
+          ? `<p><strong>Dirección:</strong> ${pedido.direccion}</p>`
+          : ''}
             <div class="divider"></div>
             <p><strong>DETALLE:</strong></p>
             <p>• ${pedido.cantidad_pollo} Pollo(s) - ${formatPrecio(pedido.precio_unitario)}</p>
@@ -160,8 +155,8 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
             <div class="divider"></div>
             <div class="footer">
               ${pedido.estado === 'entregado'
-                ? `Entregado: ${pedido.hora_entrega_real || '--:--'}`
-                : 'Pendiente de entrega'}<br>
+          ? `Entregado: ${pedido.hora_entrega_real || '--:--'}`
+          : 'Pendiente de entrega'}<br>
               ¡Gracias por su compra!
             </div>
           </body>
@@ -177,14 +172,10 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
   return (
     <button
       onClick={imprimirTicket}
-      disabled={isPrinting || impreso}
-      className={`
-        bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors
-        ${isPrinting ? 'opacity-50 cursor-not-allowed' : ''}
-        ${impreso ? '!bg-green-500 hover:!bg-green-500' : ''}
-      `}
+      disabled={isPrinting}
+      className={`bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors ${isPrinting ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
-      {impreso ? '✓ Impreso' : isPrinting ? 'Imprimiendo...' : 'Imprimir Ticket'}
+      {isPrinting ? 'Imprimiendo...' : 'Imprimir Ticket'}
     </button>
   );
 }
