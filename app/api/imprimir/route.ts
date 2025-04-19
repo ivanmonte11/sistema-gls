@@ -72,18 +72,46 @@ export async function POST(request: Request) {
     printer.println(`Fecha del pedido: ${pedido.fecha_pedido}`);
 
     const horaEntrega = pedido.hora_entrega_real || pedido.hora_entrega_solicitada;
-if (horaEntrega) {
-  printer.drawLine();
-  printer.setTextSize(1, 1);
-  printer.bold(true);
-  printer.alignCenter();
-  printer.println(pedido.hora_entrega_real ? ">>> HORA DE ENTREGA <<<" : ">>> HORA SOLICITADA <<<");
-  printer.setTextSize(2, 2);
-  printer.println(horaEntrega);
-  printer.setTextSize(1, 1);
-  printer.bold(false);
-  printer.drawLine();
-}
+    if (horaEntrega) {
+      // Primero verificar si ya es una hora simple (HH:MM)
+      let horaFormateada = horaEntrega;
+      
+      // Si contiene formato ISO (T) o es una fecha completa
+      if (horaEntrega.includes('T') || horaEntrega.includes('-')) {
+        try {
+          // Extraer solo la parte de la hora si es un formato ISO
+          const [horaPart] = horaEntrega.split('T')[1]?.split('.') || [null];
+          if (horaPart) {
+            // Tomar solo HH:MM
+            horaFormateada = horaPart.substring(0, 5);
+          } else {
+            // Si falla, intentar con el constructor Date
+            const dateObj = new Date(horaEntrega);
+            if (!isNaN(dateObj.getTime())) {
+              horaFormateada = dateObj.toLocaleTimeString('es-AR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('Error al formatear hora:', e);
+          horaFormateada = horaEntrega; // Fallback a mostrar el valor original
+        }
+      }
+    
+      printer.drawLine();
+      printer.setTextSize(1, 1);
+      printer.bold(true);
+      printer.alignCenter();
+      printer.println(pedido.hora_entrega_real ? ">>> HORA DE ENTREGA <<<" : ">>> HORA SOLICITADA <<<");
+      printer.setTextSize(2, 2);
+      printer.println(horaFormateada);
+      printer.setTextSize(1, 1);
+      printer.bold(false);
+      printer.drawLine();
+    }
     
 
     const success = await printer.execute();

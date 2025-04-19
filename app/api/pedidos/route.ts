@@ -117,7 +117,30 @@ export async function GET(request: Request) {
   try {
     const client = await pool.connect();
     
-    let query = `SELECT * FROM pedidos`;
+    let query = `
+      SELECT 
+        id,
+        numero_pedido,
+        nombre_cliente,
+        telefono_cliente,
+        tipo_entrega,
+        tipo_envio,
+        direccion,
+        metodo_pago,
+        con_chimichurri,
+        con_papas,
+        cantidad_papas,
+        cantidad_pollo,
+        precio_unitario,
+        precio_total,
+        fecha_pedido,
+        estado,
+        -- Formateamos las horas directamente en la consulta
+        TO_CHAR(hora_entrega_real, 'HH24:MI') as hora_entrega_real,
+        TO_CHAR(hora_entrega_solicitada, 'HH24:MI') as hora_entrega_solicitada,
+        TO_CHAR(hora_pedido, 'HH24:MI') as hora_pedido
+      FROM pedidos`;
+    
     const params = [];
     
     if (fecha) {
