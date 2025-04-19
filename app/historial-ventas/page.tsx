@@ -53,7 +53,7 @@ export default function HistorialVentas() {
       try {
         setIsLoading(true);
         const fechaFormateada = format(fechaSeleccionada, 'yyyy-MM-dd');
-        
+
         const [pedidosResponse, estadisticasResponse] = await Promise.all([
           fetch(`/api/pedidos?fecha=${fechaFormateada}`),
           fetch(`/api/pedidos/estadisticas?fecha=${fechaFormateada}`)
@@ -72,18 +72,18 @@ export default function HistorialVentas() {
 
         const pedidosFormateados = pedidosData.data.map((pedido: Pedido) => ({
           ...pedido,
-          precio_total: typeof pedido.precio_total === 'string' 
-            ? parseFloat(pedido.precio_total) 
+          precio_total: typeof pedido.precio_total === 'string'
+            ? parseFloat(pedido.precio_total)
             : pedido.precio_total,
-          precio_unitario: typeof pedido.precio_unitario === 'string' 
-            ? parseFloat(pedido.precio_unitario) 
+          precio_unitario: typeof pedido.precio_unitario === 'string'
+            ? parseFloat(pedido.precio_unitario)
             : pedido.precio_unitario,
           cantidad_pollo: typeof pedido.cantidad_pollo === 'string'
             ? parseFloat(pedido.cantidad_pollo)
             : pedido.cantidad_pollo,
           estado: pedido.estado || 'pendiente'
         }));
-        
+
         setPedidos(pedidosFormateados || []);
         setPedidosEntregados(pedidosFormateados.filter((p: Pedido) => p.estado === 'entregado'));
         setEstadisticas(estadisticasData.data.estadisticas);
@@ -117,7 +117,7 @@ export default function HistorialVentas() {
 
     pedidosEntregados.forEach(pedido => {
       const monto = typeof pedido.precio_total === 'number' ? pedido.precio_total : 0;
-      switch(pedido.metodo_pago) {
+      switch (pedido.metodo_pago) {
         case 'efectivo':
           totales.efectivo += monto;
           break;
@@ -154,14 +154,14 @@ export default function HistorialVentas() {
         throw new Error(data.error || 'Error al actualizar estado');
       }
 
-      setPedidos(pedidos.map(pedido => 
+      setPedidos(pedidos.map(pedido =>
         pedido.id === id ? { ...pedido, estado: nuevoEstado } : pedido
       ));
-      
+
       if (nuevoEstado === 'entregado') {
         const pedidoActualizado = pedidos.find(p => p.id === id);
         if (pedidoActualizado) {
-          setPedidosEntregados([{...pedidoActualizado, estado: 'entregado'}, ...pedidosEntregados]);
+          setPedidosEntregados([{ ...pedidoActualizado, estado: 'entregado' }, ...pedidosEntregados]);
           const statsResponse = await fetch(`/api/pedidos/estadisticas?fecha=${format(fechaSeleccionada, 'yyyy-MM-dd')}`);
           const statsData = await statsResponse.json();
           if (statsResponse.ok && statsData.success) {
@@ -182,7 +182,7 @@ export default function HistorialVentas() {
     try {
       setIsEditing(true);
       setError(null);
-  
+
       const response = await fetch('/api/pedidos', {
         method: 'PUT',
         headers: {
@@ -204,33 +204,33 @@ export default function HistorialVentas() {
           horaEntrega: pedidoEditado.hora_entrega_solicitada
         }),
       });
-  
+
       const data = await response.json();
-  
+
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Error al editar pedido');
       }
-  
+
       // Actualizar el estado local
       const pedidoActualizado = data.data;
-      setPedidos(pedidos.map(pedido => 
+      setPedidos(pedidos.map(pedido =>
         pedido.id === pedidoEditado.id ? { ...pedido, ...pedidoActualizado } : pedido
       ));
-  
+
       // Actualizar lista de entregados si es necesario
       if (pedidoEditado.estado === 'entregado') {
-        setPedidosEntregados(pedidosEntregados.map(pedido => 
+        setPedidosEntregados(pedidosEntregados.map(pedido =>
           pedido.id === pedidoEditado.id ? { ...pedido, ...pedidoActualizado } : pedido
         ));
       }
-  
+
       // Recargar estadísticas
       const statsResponse = await fetch(`/api/pedidos/estadisticas?fecha=${format(fechaSeleccionada, 'yyyy-MM-dd')}`);
       const statsData = await statsResponse.json();
       if (statsResponse.ok && statsData.success) {
         setEstadisticas(statsData.data.estadisticas);
       }
-  
+
       setPedidoAEditar(null);
       return { success: true, message: 'Pedido actualizado correctamente' };
     } catch (error) {
@@ -277,7 +277,8 @@ export default function HistorialVentas() {
   };
 
   const formatCantidadPollo = (cantidad: number) => {
-    return cantidad % 1 === 0 ? cantidad.toString() : cantidad.toFixed(1);
+    // Mostrar como entero o con .5 (sin comas)
+    return cantidad % 1 === 0 ? cantidad.toString() : cantidad.toString();
   };
 
   const formatHora = (hora: string | null) => {
@@ -290,22 +291,22 @@ export default function HistorialVentas() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6">Historial de Ventas</h1>
-      
+
       {/* Selector de fecha */}
       <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-lg shadow">
-        <button 
+        <button
           onClick={() => cambiarDia(-1)}
           className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
         >
           &larr; Día anterior
         </button>
-        
+
         <div className="text-center">
           <h2 className="text-xl font-semibold">
             {format(fechaSeleccionada, 'EEEE, d MMMM yyyy', { locale: es })}
           </h2>
           {!isSameDay(fechaSeleccionada, new Date()) && (
-            <button 
+            <button
               onClick={irADiaActual}
               className="text-sm text-blue-600 hover:underline mt-1"
             >
@@ -313,8 +314,8 @@ export default function HistorialVentas() {
             </button>
           )}
         </div>
-        
-        <button 
+
+        <button
           onClick={() => cambiarDia(1)}
           disabled={isSameDay(fechaSeleccionada, new Date())}
           className={`px-4 py-2 rounded ${isSameDay(fechaSeleccionada, new Date()) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-200 hover:bg-gray-300'}`}
@@ -337,7 +338,7 @@ export default function HistorialVentas() {
           Pedidos Entregados
         </button>
       </div>
-      
+
       <div className="overflow-x-auto mb-8">
         <table className="min-w-full bg-white rounded-lg overflow-hidden">
           <thead className="bg-gray-100">
@@ -358,17 +359,16 @@ export default function HistorialVentas() {
           </thead>
           <tbody>
             {(activeTab === 'todos' ? pedidos : pedidosEntregados).map((pedido) => (
-              <tr key={pedido.id} className={`border-b hover:bg-gray-50 ${
-                pedido.estado === 'entregado' ? 'bg-green-50' : ''
-              }`}>
+              <tr key={pedido.id} className={`border-b hover:bg-gray-50 ${pedido.estado === 'entregado' ? 'bg-green-50' : ''
+                }`}>
                 <td className="px-4 py-3">{formatNumeroPedido(pedido.numero_pedido)}</td>
                 <td className="px-4 py-3">{pedido.nombre_cliente}</td>
                 <td className="px-4 py-3">{pedido.telefono_cliente || '-'}</td>
                 <td className="px-4 py-3">{formatHora(pedido.hora_pedido)}</td>
                 <td className="px-4 py-3">{formatHora(pedido.hora_entrega_solicitada)}</td>
                 <td className="px-4 py-3">
-                  {pedido.tipo_entrega === 'envio' ? 
-                    `Envío (${formatTipoEnvio(pedido.tipo_envio)})` : 
+                  {pedido.tipo_entrega === 'envio' ?
+                    `Envío (${formatTipoEnvio(pedido.tipo_envio)})` :
                     'Retira'}
                 </td>
                 <td className="px-4 py-3">{formatMetodoPago(pedido.metodo_pago)}</td>
@@ -385,21 +385,20 @@ export default function HistorialVentas() {
                 <td className="px-4 py-3">
                   <div className="flex flex-col space-y-2">
                     <TicketPedido pedido={pedido} />
-                    
+
                     <button
                       onClick={() => setPedidoAEditar(pedido)}
                       className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded transition-colors"
                     >
                       Editar
                     </button>
-                    
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      pedido.estado === 'entregado' 
-                        ? 'bg-green-100 text-green-800' 
-                        : pedido.estado === 'cancelado'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                    }`}>
+
+                    <span className={`px-2 py-1 rounded-full text-xs ${pedido.estado === 'entregado'
+                      ? 'bg-green-100 text-green-800'
+                      : pedido.estado === 'cancelado'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                      }`}>
                       {pedido.estado}
                     </span>
 
@@ -432,9 +431,9 @@ export default function HistorialVentas() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">Editar Pedido #{pedidoAEditar.numero_pedido}</h2>
-            
+
             {error && <div className="bg-red-100 text-red-700 p-2 mb-4 rounded">{error}</div>}
-            
+
             <form onSubmit={(e) => {
               e.preventDefault();
               handleEditarPedido(pedidoAEditar);
@@ -453,7 +452,7 @@ export default function HistorialVentas() {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block mb-1 font-medium">Teléfono</label>
                   <input
@@ -466,7 +465,7 @@ export default function HistorialVentas() {
                     className="w-full p-2 border rounded"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block mb-1 font-medium">Tipo de Entrega</label>
                   <select
@@ -481,7 +480,7 @@ export default function HistorialVentas() {
                     <option value="envio">Envío</option>
                   </select>
                 </div>
-                
+
                 {pedidoAEditar.tipo_entrega === 'envio' && (
                   <div>
                     <label className="block mb-1 font-medium">Tipo de Envío</label>
@@ -500,7 +499,7 @@ export default function HistorialVentas() {
                     </select>
                   </div>
                 )}
-                
+
                 {pedidoAEditar.tipo_entrega === 'envio' && (
                   <div className="md:col-span-2">
                     <label className="block mb-1 font-medium">Dirección</label>
@@ -515,7 +514,7 @@ export default function HistorialVentas() {
                     />
                   </div>
                 )}
-                
+
                 <div>
                   <label className="block mb-1 font-medium">Método de Pago</label>
                   <select
@@ -532,39 +531,49 @@ export default function HistorialVentas() {
                     <option value="transferencia">Transferencia</option>
                   </select>
                 </div>
-                
+
                 <div>
-                  <label className="block mb-1 font-medium">Cantidad de Pollo (kg)</label>
+                  <label className="block mb-1 font-medium">Cantidad de Pollos</label>
                   <input
                     type="number"
-                    value={pedidoAEditar.cantidad_pollo}
-                    onChange={(e) => setPedidoAEditar({
-                      ...pedidoAEditar,
-                      cantidad_pollo: parseFloat(e.target.value) || 0
-                    })}
+                    value={pedidoAEditar.cantidad_pollo === 0 ? '' : pedidoAEditar.cantidad_pollo}
+                    onChange={(e) => {
+                      // Permitir campo vacío temporalmente
+                      if (e.target.value === '') {
+                        setPedidoAEditar({
+                          ...pedidoAEditar,
+                          cantidad_pollo: 0
+                        });
+                        return;
+                      }
+
+                      const value = parseFloat(e.target.value);
+                      // Validar que sea 0.5 o múltiplos
+                      if (!isNaN(value) && value >= 0.5 && value % 0.5 === 0) {
+                        setPedidoAEditar({
+                          ...pedidoAEditar,
+                          cantidad_pollo: value
+                        });
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Si al salir está vacío, poner el valor mínimo (0.5)
+                      if (e.target.value === '') {
+                        setPedidoAEditar({
+                          ...pedidoAEditar,
+                          cantidad_pollo: 0.5
+                        });
+                      }
+                    }}
                     step="0.5"
                     min="0.5"
                     className="w-full p-2 border rounded"
                     required
+                    placeholder="0.5"
                   />
+                  <p className="text-sm text-gray-500 mt-1">Ej: 0.5, 1, 1.5, 2, etc. (Mínimo 0.5)</p>
                 </div>
-                
-                <div>
-                  <label className="block mb-1 font-medium">Precio Unitario</label>
-                  <input
-                    type="number"
-                    value={pedidoAEditar.precio_unitario}
-                    onChange={(e) => setPedidoAEditar({
-                      ...pedidoAEditar,
-                      precio_unitario: parseFloat(e.target.value) || 0
-                    })}
-                    min="0"
-                    step="0.01"
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
-                
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
@@ -577,7 +586,7 @@ export default function HistorialVentas() {
                   />
                   <label>Con Chimichurri</label>
                 </div>
-                
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
@@ -590,23 +599,24 @@ export default function HistorialVentas() {
                   />
                   <label>Con Papas</label>
                 </div>
-                
+
                 {pedidoAEditar.con_papas && (
                   <div>
                     <label className="block mb-1 font-medium">Cantidad de Papas</label>
                     <input
                       type="number"
-                      value={pedidoAEditar.cantidad_papas}
+                      value={pedidoAEditar.cantidad_papas === 0 ? '' : pedidoAEditar.cantidad_papas}
                       onChange={(e) => setPedidoAEditar({
                         ...pedidoAEditar,
                         cantidad_papas: parseInt(e.target.value) || 0
                       })}
                       min="0"
                       className="w-full p-2 border rounded"
+                      placeholder="0"  // Opcional: muestra un placeholder
                     />
                   </div>
                 )}
-                
+
                 <div>
                   <label className="block mb-1 font-medium">Hora de Entrega</label>
                   <input
@@ -621,7 +631,7 @@ export default function HistorialVentas() {
                   />
                 </div>
               </div>
-              
+
               <div className="flex justify-end space-x-2">
                 <button
                   type="button"
