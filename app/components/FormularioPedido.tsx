@@ -20,6 +20,7 @@ const TablaStock = ({ stock, precio }: { stock: number; precio: number }) => {
   );
 };
 
+
 type StockData = {
   cantidad: number;
   precio: number;

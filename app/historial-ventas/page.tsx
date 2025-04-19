@@ -556,6 +556,7 @@ export default function HistorialVentas() {
                         });
                       }
                     }}
+                    
                     onBlur={(e) => {
                       // Si al salir está vacío, poner el valor mínimo (0.5)
                       if (e.target.value === '') {
