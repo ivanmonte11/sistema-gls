@@ -13,7 +13,6 @@ export async function POST(request: Request) {
   try {
     const pedido = await request.json();
 
-    // Configuración de la impresora (sin encoding ni charset inválido)
     printer = new Printer({
       type: types.EPSON,
       interface: process.env.PRINTER_IP || 'tcp://192.168.1.100',
@@ -24,7 +23,6 @@ export async function POST(request: Request) {
       }
     }) as PrinterInstance;
 
-    // Verificar conexión con 3 intentos
     let connected = false;
     for (let i = 0; i < 3; i++) {
       if (await printer.isPrinterConnected()) {
@@ -38,7 +36,6 @@ export async function POST(request: Request) {
       throw new Error('No se pudo conectar a la impresora después de 3 intentos');
     }
 
-    // Construcción del ticket
     printer.alignCenter();
     printer.bold(true);
     printer.println("GRANJA LA COLONIA");
@@ -48,39 +45,50 @@ export async function POST(request: Request) {
     printer.drawLine();
 
     printer.alignLeft();
-printer.println(`Pedido Nº: ${pedido.numero_pedido}`);
-printer.println(`Cliente: ${pedido.nombre_cliente}`);
-if (pedido.telefono_cliente) printer.println(`Teléfono: ${pedido.telefono_cliente}`);
-if (pedido.tipo_entrega === 'envio') {
-  printer.println("Tipo de entrega: Envío");
-  printer.println(`Zona: ${pedido.tipo_envio}`);
-  if (pedido.direccion) printer.println(`Dirección: ${pedido.direccion}`);
-} else {
-  printer.println("Tipo de entrega: Retira por local");
-}
-printer.drawLine();
-printer.println(`Cantidad de pollos: ${pedido.cantidad_pollo}`);
-if (pedido.con_papas) {
-  printer.println(`Con papas: Sí (${pedido.cantidad_papas})`);
-}
-if (pedido.con_chimichurri) {
-  printer.println("Con chimichurri: Sí");
-}
-printer.drawLine();
-printer.println(`Método de pago: ${pedido.metodo_pago}`);
-printer.println(`Total: $${pedido.precio_total}`);
-printer.drawLine();
-printer.println(`Fecha: ${pedido.fecha_pedido}`);
+    printer.println(`Pedido Nº: ${pedido.numero_pedido}`);
+    printer.println(`Cliente: ${pedido.nombre_cliente}`);
+    if (pedido.telefono_cliente) printer.println(`Teléfono: ${pedido.telefono_cliente}`);
+    if (pedido.tipo_entrega === 'envio') {
+      printer.println("Tipo de entrega: Envío");
+      printer.println(`Zona: ${pedido.tipo_envio}`);
+      if (pedido.direccion) printer.println(`Dirección: ${pedido.direccion}`);
+    } else {
+      printer.println("Tipo de entrega: Retira por local");
+    }
 
+    printer.drawLine();
+    printer.println(`Cantidad de pollos: ${pedido.cantidad_pollo}`);
+    if (pedido.con_papas) {
+      printer.println(`Con papas: Sí (${pedido.cantidad_papas})`);
+    }
+    if (pedido.con_chimichurri) {
+      printer.println("Con chimichurri: Sí");
+    }
 
-    // Ejecutar impresión
-    try {
-      const success = await printer.execute();
-      if (!success) {
-        throw new Error('La impresora no respondió correctamente');
-      }
-    } catch (printError) {
-      throw new Error(`Error al enviar a imprimir: ${printError instanceof Error ? printError.message : 'Error desconocido'}`);
+    printer.drawLine();
+    printer.println(`Método de pago: ${pedido.metodo_pago}`);
+    printer.println(`Total: $${pedido.precio_total}`);
+    printer.drawLine();
+    printer.println(`Fecha del pedido: ${pedido.fecha_pedido}`);
+
+    const horaEntrega = pedido.hora_entrega_real || pedido.hora_entrega_solicitada;
+if (horaEntrega) {
+  printer.drawLine();
+  printer.setTextSize(1, 1);
+  printer.bold(true);
+  printer.alignCenter();
+  printer.println(pedido.hora_entrega_real ? ">>> HORA DE ENTREGA <<<" : ">>> HORA SOLICITADA <<<");
+  printer.setTextSize(2, 2);
+  printer.println(horaEntrega);
+  printer.setTextSize(1, 1);
+  printer.bold(false);
+  printer.drawLine();
+}
+    
+
+    const success = await printer.execute();
+    if (!success) {
+      throw new Error('La impresora no respondió correctamente');
     }
 
     return NextResponse.json({
@@ -101,8 +109,10 @@ printer.println(`Fecha: ${pedido.fecha_pedido}`);
       { status: 500 }
     );
   } finally {
-    if (printer) {
-      await printer.close().catch(e => console.error('Error cerrando impresora:', e));
+    try {
+      await printer?.close();
+    } catch (e) {
+      console.warn('No se pudo cerrar la conexión con la impresora');
     }
   }
 }
