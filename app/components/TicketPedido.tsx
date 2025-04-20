@@ -45,9 +45,9 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
   const formatTipoEnvio = (tipo: string | null): string => {
     if (!tipo) return '';
     const tipos: Record<string, string> = {
-      cercano: 'Cercano',
-      lejano: 'Lejano (+$500)',
-      la_banda: 'La Banda (+$800)',
+      cercano: 'Cercano',       // Eliminado (+$500)
+      lejano: 'Lejano',         // Eliminado (+$500)
+      la_banda: 'La Banda',     // Eliminado (+$800)
       gratis: 'Gratis'
     };
     return tipos[tipo] || tipo;
