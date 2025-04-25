@@ -46,7 +46,11 @@ export async function POST(request: Request) {
 
     printer.alignLeft();
     printer.println(`Pedido Nº: ${pedido.numero_pedido}`);
-    printer.println(`Cliente: ${pedido.nombre_cliente}`);
+    printer.bold(true);
+    printer.setTextSize(1, 2); 
+    printer.println(`CLIENTE: ${pedido.nombre_cliente.toUpperCase()}`);
+    printer.setTextSize(1, 1); 
+    printer.bold(false);
     if (pedido.telefono_cliente) printer.println(`Teléfono: ${pedido.telefono_cliente}`);
     if (pedido.tipo_entrega === 'envio') {
       printer.println("Tipo de entrega: Envío");
@@ -56,14 +60,29 @@ export async function POST(request: Request) {
       printer.println("Tipo de entrega: Retira por local");
     }
 
+    printer.drawLine(); // Línea superior de separación
+
+    // Título destacado
     printer.drawLine();
-    printer.println(`Cantidad de pollos: ${pedido.cantidad_pollo}`);
+    printer.bold(true);
+    printer.println("--- ITEMS DEL PEDIDO ---");
+    printer.bold(false);
+    
+    // Pollo
+    printer.setTextSize(2, 2);
+    printer.println("» POLLOS: " + pedido.cantidad_pollo);
+    printer.setTextSize(1, 1);
+    
+    // Papas
     if (pedido.con_papas) {
-      printer.println(`Con papas: Sí (${pedido.cantidad_papas})`);
+      printer.println("* PAPAS: " + pedido.cantidad_papas);
     }
+    
+    // Chimichurri
     if (pedido.con_chimichurri) {
-      printer.println("Con chimichurri: Sí");
+      printer.println("> CHIMICHURRI INCLUIDO");
     }
+    printer.drawLine();
 
     printer.drawLine();
     printer.println(`Método de pago: ${pedido.metodo_pago}`);
@@ -75,7 +94,7 @@ export async function POST(request: Request) {
     if (horaEntrega) {
       // Primero verificar si ya es una hora simple (HH:MM)
       let horaFormateada = horaEntrega;
-      
+
       // Si contiene formato ISO (T) o es una fecha completa
       if (horaEntrega.includes('T') || horaEntrega.includes('-')) {
         try {
@@ -100,7 +119,7 @@ export async function POST(request: Request) {
           horaFormateada = horaEntrega; // Fallback a mostrar el valor original
         }
       }
-    
+
       printer.drawLine();
       printer.setTextSize(1, 1);
       printer.bold(true);
@@ -112,7 +131,7 @@ export async function POST(request: Request) {
       printer.bold(false);
       printer.drawLine();
     }
-    
+
 
     const success = await printer.execute();
     if (!success) {

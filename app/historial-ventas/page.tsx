@@ -340,90 +340,98 @@ export default function HistorialVentas() {
       </div>
 
       <div className="overflow-x-auto mb-8">
-  <table className="min-w-full bg-white rounded-lg overflow-hidden">
-    <thead className="bg-gray-100">
-      <tr>
-        <th className="px-4 py-2">N° Pedido</th>
-        <th className="px-4 py-2">Cliente</th>
-        <th className="px-4 py-2">Teléfono</th>
-        <th className="px-4 py-2">Hora Pedido</th>
-        <th className="px-4 py-2">Hora Entrega</th>
-        <th className="px-4 py-2">Entrega</th>
-        <th className="px-4 py-2">Pago</th>
-        <th className="px-4 py-2">Chimi</th>
-        <th className="px-4 py-2">Papas</th>
-        <th className="px-4 py-2">Cant. Pollo</th>
-        <th className="px-4 py-2">Total</th>
-        <th className="px-4 py-2">Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      {(activeTab === 'todos' ? pedidos : pedidosEntregados).map((pedido) => (
-        <tr key={pedido.id} className={`border-b hover:bg-gray-50 ${pedido.estado === 'entregado' ? 'bg-green-50' : ''}`}>
-          <td className="px-4 py-3">{formatNumeroPedido(pedido.numero_pedido)}</td>
-          <td className="px-4 py-3">{pedido.nombre_cliente}</td>
-          <td className="px-4 py-3">{pedido.telefono_cliente || '-'}</td>
-          <td className="px-4 py-3">{formatHora(pedido.hora_pedido)}</td>
-          <td className="px-4 py-3 bg-yellow-100">{formatHora(pedido.hora_entrega_solicitada)}</td> {/* Aquí el cambio */}
-          <td className="px-4 py-3">
-            {pedido.tipo_entrega === 'envio' ?
-              `Envío (${formatTipoEnvio(pedido.tipo_envio)})` :
-              'Retira'}
-          </td>
-          <td className="px-4 py-3">{formatMetodoPago(pedido.metodo_pago)}</td>
-          <td className="px-4 py-3 text-center">
-            {pedido.con_chimichurri ? '✅' : '❌'}
-          </td>
-          <td className="px-4 py-3 text-center">
-            {pedido.con_papas ? `${pedido.cantidad_papas} 🍟` : '❌'}
-          </td>
-          <td className="px-4 py-3">{formatCantidadPollo(pedido.cantidad_pollo)}</td>
-          <td className="px-4 py-3 font-semibold">
-            {formatPrecio(pedido.precio_total)}
-          </td>
-          <td className="px-4 py-3">
-            <div className="flex flex-col space-y-2">
-              <TicketPedido pedido={pedido} />
+        <table className="min-w-full bg-white rounded-lg overflow-hidden">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-4 py-2">N° Pedido</th>
+              <th className="px-4 py-2">Cliente</th>
+              <th className="px-4 py-2">Teléfono</th>
+              <th className="px-4 py-2">Hora Pedido</th>
+              <th className="px-4 py-2">Hora Entrega</th>
+              <th className="px-4 py-2">Entrega</th>
+              <th className="px-4 py-2">Pago</th>
+              <th className="px-4 py-2">Chimi</th>
+              <th className="px-4 py-2">Papas</th>
+              <th className="px-4 py-2">Cant. Pollo</th>
+              <th className="px-4 py-2">Total</th>
+              <th className="px-4 py-2">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(activeTab === 'todos' ? pedidos : pedidosEntregados).map((pedido) => (
+              <tr key={pedido.id} className={`border-b hover:bg-gray-50 ${pedido.estado === 'entregado' ? 'bg-green-50' : ''}`}>
+                <td className="px-4 py-3">{formatNumeroPedido(pedido.numero_pedido)}</td>
+                <td className={`
+                  text-lg
+                  font-bold 
+                  text-gray-800 
+                  tracking-wide 
+                  ${pedido.estado === 'urgente' ? 'text-red-600' : ''}    
+                  `}>
+                  {pedido.nombre_cliente}
+                </td>
+                <td className="px-4 py-3">{pedido.telefono_cliente || '-'}</td>
+                <td className="px-4 py-3">{formatHora(pedido.hora_pedido)}</td>
+                <td className="px-4 py-3 bg-yellow-100">{formatHora(pedido.hora_entrega_solicitada)}</td> {/* Aquí el cambio */}
+                <td className="px-4 py-3">
+                  {pedido.tipo_entrega === 'envio' ?
+                    `Envío (${formatTipoEnvio(pedido.tipo_envio)})` :
+                    'Retira'}
+                </td>
+                <td className="px-4 py-3">{formatMetodoPago(pedido.metodo_pago)}</td>
+                <td className="px-4 py-3 text-center">
+                  {pedido.con_chimichurri ? '✅' : '❌'}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {pedido.con_papas ? `${pedido.cantidad_papas} 🍟` : '❌'}
+                </td>
+                <td className="px-4 py-3">{formatCantidadPollo(pedido.cantidad_pollo)}</td>
+                <td className="px-4 py-3 font-semibold">
+                  {formatPrecio(pedido.precio_total)}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col space-y-2">
+                    <TicketPedido pedido={pedido} />
 
-              <button
-                onClick={() => setPedidoAEditar(pedido)}
-                className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded transition-colors"
-              >
-                Editar
-              </button>
+                    <button
+                      onClick={() => setPedidoAEditar(pedido)}
+                      className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded transition-colors"
+                    >
+                      Editar
+                    </button>
 
-              <span className={`px-2 py-1 rounded-full text-xs ${pedido.estado === 'entregado'
-                ? 'bg-green-100 text-green-800'
-                : pedido.estado === 'cancelado'
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                {pedido.estado}
-              </span>
+                    <span className={`px-2 py-1 rounded-full text-xs ${pedido.estado === 'entregado'
+                      ? 'bg-green-100 text-green-800'
+                      : pedido.estado === 'cancelado'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                      {pedido.estado}
+                    </span>
 
-              {pedido.estado !== 'entregado' && pedido.estado !== 'cancelado' && (
-                <>
-                  <button
-                    onClick={() => actualizarEstadoPedido(pedido.id, 'entregado')}
-                    className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded transition-colors"
-                  >
-                    Marcar como entregado
-                  </button>
-                  <button
-                    onClick={() => actualizarEstadoPedido(pedido.id, 'cancelado')}
-                    className="bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded transition-colors"
-                  >
-                    Cancelar pedido
-                  </button>
-                </>
-              )}
-            </div>
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
+                    {pedido.estado !== 'entregado' && pedido.estado !== 'cancelado' && (
+                      <>
+                        <button
+                          onClick={() => actualizarEstadoPedido(pedido.id, 'entregado')}
+                          className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded transition-colors"
+                        >
+                          Marcar como entregado
+                        </button>
+                        <button
+                          onClick={() => actualizarEstadoPedido(pedido.id, 'cancelado')}
+                          className="bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded transition-colors"
+                        >
+                          Cancelar pedido
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {/* Modal de Edición */}
       {pedidoAEditar && (

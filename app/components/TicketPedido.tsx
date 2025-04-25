@@ -144,7 +144,12 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
             </div>
       
             <div class="divider"></div>
-            <p><strong>Cliente:</strong> ${pedido.nombre_cliente}</p>
+            <div style="margin: 8px 0;">
+  <div style="font-size: 12px; color: #555;">CLIENTE</div>
+  <div style="font-size: 1.4em; font-weight: bold; letter-spacing: 0.5px;">
+    ${pedido.nombre_cliente.toUpperCase()}
+  </div>
+</div>
             ${pedido.telefono_cliente ? `<p><strong>Teléfono:</strong> ${pedido.telefono_cliente}</p>` : ''}
             <p><strong>Entrega:</strong> ${pedido.tipo_entrega === 'envio'
               ? `Envío (${formatTipoEnvio(pedido.tipo_envio)})`
@@ -153,10 +158,29 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
               ? `<p><strong>Dirección:</strong> ${pedido.direccion}</p>`
               : ''}
             <div class="divider"></div>
-            <p><strong>DETALLE:</strong></p>
-            <p>• ${formatCantidadPollo(pedido.cantidad_pollo)} Pollo(s)</p>
-            ${pedido.con_papas ? `<p>• ${pedido.cantidad_papas} Papas fritas</p>` : ''}
-            ${pedido.con_chimichurri ? '<p>• Chimichurri incluido</p>' : ''}
+            <div class="divider"></div>
+
+<div style="text-align: center; font-weight: bold; font-size: 1.2em; margin: 10px 0;">
+  📝 DETALLES DEL PEDIDO
+</div>
+
+<div style="font-weight: bold; font-size: 1.3em; color: #d35400; margin: 8px 0;">
+  ➤ ${formatCantidadPollo(pedido.cantidad_pollo).toUpperCase()} POLLO(S)
+</div>
+
+${pedido.con_papas ? `
+  <div style="font-weight: bold; font-size: 1.1em; margin: 6px 0;">
+    🍟 ${pedido.cantidad_papas} PAPAS FRITAS
+  </div>
+` : ''}
+
+${pedido.con_chimichurri ? `
+  <div style="font-weight: bold; font-size: 1.1em; margin: 6px 0;">
+    🌿 CHIMICHURRI INCLUIDO
+  </div>
+` : ''}
+
+<div class="divider"></div>
             <div class="divider"></div>
             <p><strong>TOTAL:</strong> ${formatPrecio(pedido.precio_total)}</p>
             <p><strong>Método pago:</strong> ${formatMetodoPago(pedido.metodo_pago)}</p>
