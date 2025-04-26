@@ -45,9 +45,9 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
   const formatTipoEnvio = (tipo: string | null): string => {
     if (!tipo) return '';
     const tipos: Record<string, string> = {
-      cercano: 'Cercano',       // Eliminado (+$500)
-      lejano: 'Lejano',         // Eliminado (+$500)
-      la_banda: 'La Banda',     // Eliminado (+$800)
+      cercano: 'Cercano',
+      lejano: 'Lejano',
+      la_banda: 'La Banda',
       gratis: 'Gratis'
     };
     return tipos[tipo] || tipo;
@@ -132,12 +132,16 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
             <div class="header">Francisco Viano 130 - Tel: 3856146824</div>
             <div class="divider"></div>
             <div class="header">PEDIDO #${pedido.numero_pedido}</div>
+            ${/* Sección de fecha comentada - inicio */''}
+            ${/*
             <p><strong>Fecha del pedido:</strong> ${new Date(pedido.fecha_pedido).toLocaleDateString('es-AR', {
-        timeZone: 'America/Argentina/Buenos_Aires', // Misma zona que backend
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      })}</p>
+              timeZone: 'America/Argentina/Buenos_Aires',
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            })}</p>
+            */''}
+            ${/* Sección de fecha comentada - fin */''}
             
             <div class="hora-destacada">
               <div>🕒 HORA DE ENTREGA 🕒</div>
@@ -146,57 +150,57 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
       
             <div class="divider"></div>
             <div style="margin: 8px 0;">
-  <div style="font-size: 12px; color: #555;">CLIENTE</div>
-  <div style="font-size: 1.4em; font-weight: bold; letter-spacing: 0.5px;">
-    ${pedido.nombre_cliente.toUpperCase()}
-  </div>
-</div>
-          <p>
-  <strong>Tipo entrega:</strong> 
-  ${pedido.tipo_entrega === 'envio'
-          ? `<span style="font-weight: bold">ENVÍO (${formatTipoEnvio(pedido.tipo_envio)})</span>`
-          : '<span style="font-weight: bold">RETIRA EN LOCAL</span>'
-        }
-</p>
+              <div style="font-size: 12px; color: #555;">CLIENTE</div>
+              <div style="font-size: 1.4em; font-weight: bold; letter-spacing: 0.5px;">
+                ${pedido.nombre_cliente.toUpperCase()}
+              </div>
+            </div>
+            <p>
+              <strong>Tipo entrega:</strong> 
+              ${pedido.tipo_entrega === 'envio'
+                ? `<span style="font-weight: bold">ENVÍO (${formatTipoEnvio(pedido.tipo_envio)})</span>`
+                : '<span style="font-weight: bold">RETIRA EN LOCAL</span>'
+              }
+            </p>
 
-${pedido.tipo_entrega === 'envio' && pedido.direccion ? `
-  <p>
-    <strong>Dirección:</strong> 
-    <span style="font-weight: bold">${pedido.direccion}</span>
-  </p>
-` : ''}
+            ${pedido.tipo_entrega === 'envio' && pedido.direccion ? `
+              <p>
+                <strong>Dirección:</strong> 
+                <span style="font-weight: bold">${pedido.direccion}</span>
+              </p>
+            ` : ''}
             <div class="divider"></div>
             <div class="divider"></div>
 
-<div style="text-align: center; font-weight: bold; font-size: 1.2em; margin: 10px 0;">
-  📝 DETALLES DEL PEDIDO
-</div>
+            <div style="text-align: center; font-weight: bold; font-size: 1.2em; margin: 10px 0;">
+              📝 DETALLES DEL PEDIDO
+            </div>
 
-<div style="font-weight: bold; font-size: 1.3em; color: #d35400; margin: 8px 0;">
-  ➤ ${formatCantidadPollo(pedido.cantidad_pollo).toUpperCase()} POLLO(S)
-</div>
+            <div style="font-weight: bold; font-size: 1.3em; color: #d35400; margin: 8px 0;">
+              ➤ ${formatCantidadPollo(pedido.cantidad_pollo).toUpperCase()} POLLO(S)
+            </div>
 
-${pedido.con_papas ? `
-  <div style="font-weight: bold; font-size: 1.1em; margin: 6px 0;">
-    🍟 ${pedido.cantidad_papas} PAPAS FRITAS
-  </div>
-` : ''}
+            ${pedido.con_papas ? `
+              <div style="font-weight: bold; font-size: 1.1em; margin: 6px 0;">
+                🍟 ${pedido.cantidad_papas} PAPAS FRITAS
+              </div>
+            ` : ''}
 
-${pedido.con_chimichurri ? `
-  <div style="font-weight: bold; font-size: 1.1em; margin: 6px 0;">
-    🌿 CHIMICHURRI INCLUIDO
-  </div>
-` : ''}
+            ${pedido.con_chimichurri ? `
+              <div style="font-weight: bold; font-size: 1.1em; margin: 6px 0;">
+                🌿 CHIMICHURRI INCLUIDO
+              </div>
+            ` : ''}
 
-<div class="divider"></div>
+            <div class="divider"></div>
             <div class="divider"></div>
             <p><strong>TOTAL:</strong> ${formatPrecio(pedido.precio_total)}</p>
             <p><strong>Método pago:</strong> ${formatMetodoPago(pedido.metodo_pago)}</p>
             <div class="divider"></div>
             <div class="footer">
               ${pedido.estado === 'entregado'
-          ? `Entregado: ${pedido.hora_entrega_real || '--:--'}`
-          : 'Pendiente de entrega'}<br>
+                ? `Entregado: ${pedido.hora_entrega_real || '--:--'}`
+                : 'Pendiente de entrega'}<br>
               ¡Gracias por su compra!
             </div>
           </body>
