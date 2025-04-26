@@ -133,10 +133,11 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
             <div class="divider"></div>
             <div class="header">PEDIDO #${pedido.numero_pedido}</div>
             <p><strong>Fecha del pedido:</strong> ${new Date(pedido.fecha_pedido).toLocaleDateString('es-AR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric'
-            })}</p>
+        timeZone: 'America/Argentina/Buenos_Aires', // Misma zona que backend
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      })}</p>
             
             <div class="hora-destacada">
               <div>🕒 HORA DE ENTREGA 🕒</div>
@@ -152,10 +153,10 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
 </div>
           <p>
   <strong>Tipo entrega:</strong> 
-  ${pedido.tipo_entrega === 'envio' 
-    ? `<span style="font-weight: bold">ENVÍO (${formatTipoEnvio(pedido.tipo_envio)})</span>` 
-    : '<span style="font-weight: bold">RETIRA EN LOCAL</span>'
-  }
+  ${pedido.tipo_entrega === 'envio'
+          ? `<span style="font-weight: bold">ENVÍO (${formatTipoEnvio(pedido.tipo_envio)})</span>`
+          : '<span style="font-weight: bold">RETIRA EN LOCAL</span>'
+        }
 </p>
 
 ${pedido.tipo_entrega === 'envio' && pedido.direccion ? `
@@ -194,8 +195,8 @@ ${pedido.con_chimichurri ? `
             <div class="divider"></div>
             <div class="footer">
               ${pedido.estado === 'entregado'
-                ? `Entregado: ${pedido.hora_entrega_real || '--:--'}`
-                : 'Pendiente de entrega'}<br>
+          ? `Entregado: ${pedido.hora_entrega_real || '--:--'}`
+          : 'Pendiente de entrega'}<br>
               ¡Gracias por su compra!
             </div>
           </body>

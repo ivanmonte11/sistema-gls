@@ -88,7 +88,14 @@ export async function POST(request: Request) {
     printer.println(`Método de pago: ${pedido.metodo_pago}`);
     printer.println(`Total: $${pedido.precio_total}`);
     printer.drawLine();
-    printer.println(`Fecha del pedido: ${pedido.fecha_pedido}`);
+    const fechaPedido = new Date(pedido.fecha_pedido);
+const fechaFormateada = fechaPedido.toLocaleDateString('es-AR', {
+  timeZone: 'America/Argentina/Buenos_Aires', // Ajustar según tu zona
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric'
+});
+printer.println(`Fecha del pedido: ${fechaFormateada}`);
 
     const horaEntrega = pedido.hora_entrega_real || pedido.hora_entrega_solicitada;
     if (horaEntrega) {
