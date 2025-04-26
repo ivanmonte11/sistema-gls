@@ -7,11 +7,56 @@ type PrinterInstance = InstanceType<typeof Printer> & {
   close(): Promise<void>;
 };
 
+interface Pedido {
+  id: number;
+  numero_pedido: string;
+  nombre_cliente: string;
+  telefono_cliente?: string;
+  tipo_entrega: 'retira' | 'envio';
+  tipo_envio: 'cercano' | 'lejano' | 'la_banda' | 'gratis' | null;
+  direccion?: string;
+  metodo_pago: string;
+  con_chimichurri: boolean;
+  con_papas: boolean;
+  cantidad_papas: number;
+  cantidad_pollo: number;
+  precio_unitario: number;
+  precio_total: number | string;
+  fecha_pedido: string;
+  hora_entrega_real?: string | null;
+  hora_entrega_solicitada?: string | null;
+  estado?: string;
+}
+
+const formatFechaArgentina = (fechaInput: string | Date): string => {
+  try {
+    const fecha = new Date(fechaInput);
+    const offsetArgentina = -3 * 60 * 60 * 1000; // GMT-3 para Argentina
+    const fechaArgentina = new Date(fecha.getTime() + offsetArgentina);
+    
+    const dia = fechaArgentina.getDate().toString().padStart(2, '0');
+    const mes = (fechaArgentina.getMonth() + 1).toString().padStart(2, '0');
+    const año = fechaArgentina.getFullYear();
+    
+    return `${dia}/${mes}/${año}`;
+  } catch (error) {
+    console.error('Error al formatear fecha:', error);
+    return 'Fecha inválida';
+  }
+};
+
 export async function POST(request: Request) {
   let printer: PrinterInstance | undefined;
+  let pedido: Pedido | null = null;
 
   try {
-    const pedido = await request.json();
+    pedido = await request.json() as Pedido;
+    
+    console.log('[DEBUG] Fecha recibida:', {
+      original: pedido.fecha_pedido,
+      tipo: typeof pedido.fecha_pedido,
+      parsed: new Date(pedido.fecha_pedido).toISOString()
+    });
 
     printer = new Printer({
       type: types.EPSON,
@@ -60,25 +105,19 @@ export async function POST(request: Request) {
       printer.println("Tipo de entrega: Retira por local");
     }
 
-    printer.drawLine(); // Línea superior de separación
-
-    // Título destacado
     printer.drawLine();
     printer.bold(true);
     printer.println("--- ITEMS DEL PEDIDO ---");
     printer.bold(false);
     
-    // Pollo
     printer.setTextSize(2, 2);
     printer.println("» POLLOS: " + pedido.cantidad_pollo);
     printer.setTextSize(1, 1);
     
-    // Papas
     if (pedido.con_papas) {
       printer.println("* PAPAS: " + pedido.cantidad_papas);
     }
     
-    // Chimichurri
     if (pedido.con_chimichurri) {
       printer.println("> CHIMICHURRI INCLUIDO");
     }
@@ -88,30 +127,18 @@ export async function POST(request: Request) {
     printer.println(`Método de pago: ${pedido.metodo_pago}`);
     printer.println(`Total: $${pedido.precio_total}`);
     printer.drawLine();
-    const fechaPedido = new Date(pedido.fecha_pedido);
-const fechaFormateada = fechaPedido.toLocaleDateString('es-AR', {
-  timeZone: 'America/Argentina/Buenos_Aires', // Ajustar según tu zona
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric'
-});
-printer.println(`Fecha del pedido: ${fechaFormateada}`);
+    printer.println(`Fecha del pedido: ${formatFechaArgentina(pedido.fecha_pedido)}`);
 
     const horaEntrega = pedido.hora_entrega_real || pedido.hora_entrega_solicitada;
     if (horaEntrega) {
-      // Primero verificar si ya es una hora simple (HH:MM)
       let horaFormateada = horaEntrega;
 
-      // Si contiene formato ISO (T) o es una fecha completa
       if (horaEntrega.includes('T') || horaEntrega.includes('-')) {
         try {
-          // Extraer solo la parte de la hora si es un formato ISO
           const [horaPart] = horaEntrega.split('T')[1]?.split('.') || [null];
           if (horaPart) {
-            // Tomar solo HH:MM
             horaFormateada = horaPart.substring(0, 5);
           } else {
-            // Si falla, intentar con el constructor Date
             const dateObj = new Date(horaEntrega);
             if (!isNaN(dateObj.getTime())) {
               horaFormateada = dateObj.toLocaleTimeString('es-AR', {
@@ -123,7 +150,7 @@ printer.println(`Fecha del pedido: ${fechaFormateada}`);
           }
         } catch (e) {
           console.warn('Error al formatear hora:', e);
-          horaFormateada = horaEntrega; // Fallback a mostrar el valor original
+          horaFormateada = horaEntrega;
         }
       }
 
@@ -139,7 +166,6 @@ printer.println(`Fecha del pedido: ${fechaFormateada}`);
       printer.drawLine();
     }
 
-
     const success = await printer.execute();
     if (!success) {
       throw new Error('La impresora no respondió correctamente');
@@ -147,26 +173,36 @@ printer.println(`Fecha del pedido: ${fechaFormateada}`);
 
     return NextResponse.json({
       success: true,
-      message: 'Ticket impreso correctamente'
+      message: 'Ticket impreso correctamente',
+      fechaFormateada: formatFechaArgentina(pedido.fecha_pedido)
     });
 
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    console.error('Error en impresión:', error);
+    console.error('[ERROR]', {
+      error: error instanceof Error ? error.message : 'Error desconocido',
+      pedido: pedido ? {
+        fecha: pedido.fecha_pedido,
+        tipo: typeof pedido.fecha_pedido
+      } : 'No se recibió pedido',
+      stack: error instanceof Error ? error.stack : null
+    });
 
     return NextResponse.json(
       {
         success: false,
         error: 'Error al imprimir ticket',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : null
+        details: process.env.NODE_ENV === 'development' ? 
+          (error instanceof Error ? error.message : 'Unknown error') : null
       },
       { status: 500 }
     );
   } finally {
-    try {
-      await printer?.close();
-    } catch (e) {
-      console.warn('No se pudo cerrar la conexión con la impresora');
+    if (printer) {
+      try {
+        await printer.close();
+      } catch (e) {
+        console.warn('Error al cerrar impresora:', e);
+      }
     }
   }
 }
