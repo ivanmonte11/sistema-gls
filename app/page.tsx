@@ -31,7 +31,7 @@ export default function Home() {
   </div>
 </Link>
 
-        {/* Tarjeta 2: Gestión de Clientes */}
+        {/* Tarjeta 2: Gestión de Clientes 
         <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
           <div className="text-green-600 mb-4">
             <svg
@@ -52,7 +52,7 @@ export default function Home() {
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Gestión de Clientes</h2>
           <p className="text-gray-600">Administra la información de tus clientes.</p>
         </div>
-
+          */}
        
        {/* Tarjeta 4: Registrar Pedido */}
 <Link href="/registrar-pedido">

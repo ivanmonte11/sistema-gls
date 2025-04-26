@@ -150,13 +150,20 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
     ${pedido.nombre_cliente.toUpperCase()}
   </div>
 </div>
-            ${pedido.telefono_cliente ? `<p><strong>Teléfono:</strong> ${pedido.telefono_cliente}</p>` : ''}
-            <p><strong>Entrega:</strong> ${pedido.tipo_entrega === 'envio'
-              ? `Envío (${formatTipoEnvio(pedido.tipo_envio)})`
-              : 'Retira en local'}</p>
-            ${pedido.tipo_entrega === 'envio' && pedido.direccion
-              ? `<p><strong>Dirección:</strong> ${pedido.direccion}</p>`
-              : ''}
+          <p>
+  <strong>Tipo entrega:</strong> 
+  ${pedido.tipo_entrega === 'envio' 
+    ? `<span style="font-weight: bold">ENVÍO (${formatTipoEnvio(pedido.tipo_envio)})</span>` 
+    : '<span style="font-weight: bold">RETIRA EN LOCAL</span>'
+  }
+</p>
+
+${pedido.tipo_entrega === 'envio' && pedido.direccion ? `
+  <p>
+    <strong>Dirección:</strong> 
+    <span style="font-weight: bold">${pedido.direccion}</span>
+  </p>
+` : ''}
             <div class="divider"></div>
             <div class="divider"></div>
 
