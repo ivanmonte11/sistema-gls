@@ -327,57 +327,80 @@ export default function FormularioPedido() {
   <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-lg shadow">
     <h2 className="text-xl font-bold mb-4">Nuevo Pedido</h2>
     
-    {/* Selector de cliente */}
-    <div className="relative">
-      <label className="block text-gray-700 mb-1">Buscar cliente existente</label>
-      <input
-        type="text"
-        value={cliente ? cliente.name : busquedaCliente}
-        onChange={(e) => {
-          setBusquedaCliente(e.target.value);
-          if (!e.target.value) {
-            setCliente(null);
-            setTelefono('');
-            setDireccion('');
-          }
+   {/* Selector de cliente - Versión mejorada */}
+<div className="relative">
+  <label className="block text-gray-700 mb-1">Buscar cliente existente</label>
+  <div className="flex items-center">
+    <input
+      type="text"
+      value={busquedaCliente}  // Siempre usa busquedaCliente como valor
+      onChange={(e) => {
+        setBusquedaCliente(e.target.value);
+        // Si el input está vacío, limpiamos la selección
+        if (!e.target.value) {
+          setCliente(null);
+          setTelefono('');
+          setDireccion('');
+        }
+      }}
+      placeholder={cliente ? cliente.name : "Nombre o teléfono..."}
+      className="w-full p-2 border rounded"
+      onFocus={() => {
+        if (busquedaCliente.length > 2 || cliente) {
+          setMostrarSugerencias(true);
+        }
+      }}
+      onBlur={() => setTimeout(() => setMostrarSugerencias(false), 200)}
+    />
+    
+    {/* Botón para limpiar selección */}
+    {cliente && (
+      <button
+        type="button"
+        onClick={() => {
+          setCliente(null);
+          setBusquedaCliente('');
+          setTelefono('');
+          setDireccion('');
         }}
-        placeholder="Nombre o teléfono del cliente..."
-        className="w-full p-2 border rounded"
-        onFocus={() => busquedaCliente.length > 2 && setMostrarSugerencias(true)}
-        onBlur={() => setTimeout(() => setMostrarSugerencias(false), 200)}
-      />
-      {cargandoClientes && (
-        <div className="absolute right-2 top-8">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
-        </div>
-      )}
-      
-      {mostrarSugerencias && clientesSugeridos.length > 0 && (
-        <ul className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-auto">
-          {clientesSugeridos.map((cliente) => (
-            <li 
-              key={cliente.id}
-              onClick={() => {
-                setCliente(cliente);
-                setBusquedaCliente(cliente.name);
-                setTelefono(cliente.phone || '');
-                setDireccion(cliente.address || ''); // Autocompletar dirección
-                setMostrarSugerencias(false);
-              }}
-              className="p-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
-            >
-              <div className="font-medium">{cliente.name}</div>
-              {cliente.phone && (
-                <div className="text-sm text-gray-600">{cliente.phone}</div>
-              )}
-              {cliente.address && (
-                <div className="text-sm text-gray-500 truncate">{cliente.address}</div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+        className="ml-2 text-gray-500 hover:text-gray-700"
+        title="Borrar selección"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+        </svg>
+      </button>
+    )}
+  </div>
+
+  {cargandoClientes && (
+    <div className="absolute right-2 top-8">
+      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
     </div>
+  )}
+  
+  {mostrarSugerencias && clientesSugeridos.length > 0 && (
+    <ul className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-auto">
+      {clientesSugeridos.map((cliente) => (
+        <li 
+          key={cliente.id}
+          onClick={() => {
+            setCliente(cliente);
+            setBusquedaCliente(cliente.name);  // Actualiza el valor de búsqueda
+            setTelefono(cliente.phone || '');
+            setDireccion(cliente.address || '');
+            setMostrarSugerencias(false);
+          }}
+          className="p-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+        >
+          <div className="font-medium">{cliente.name}</div>
+          {cliente.phone && <div className="text-sm text-gray-600">{cliente.phone}</div>}
+          {cliente.address && <div className="text-sm text-gray-500 truncate">{cliente.address}</div>}
+        </li>
+      ))}
+    </ul>
+  )}
+</div>
 
     {/* Campos de teléfono y dirección */}
     <div>
