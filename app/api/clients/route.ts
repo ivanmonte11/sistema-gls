@@ -14,6 +14,20 @@ export async function GET(request: Request) {
   const offset = (page - 1) * limit;
 
   try {
+    // Consulta optimizada para autocompletado
+    if (searchParams.get('autocomplete') === 'true') {
+      const result = await pool.query(
+        `SELECT id, name, phone, address 
+         FROM clients 
+         WHERE name ILIKE $1 OR phone ILIKE $1
+         ORDER BY name ASC 
+         LIMIT 20`,
+        [`%${search}%`]
+      );
+      return NextResponse.json(result.rows);
+    }
+
+    // Consulta normal con paginación
     const query = `
       SELECT id, name, phone, address, created_at 
       FROM clients
