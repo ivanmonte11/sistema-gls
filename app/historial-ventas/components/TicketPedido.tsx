@@ -154,6 +154,11 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
               <div style="font-size: 1.4em; font-weight: bold; letter-spacing: 0.5px;">
                 ${pedido.nombre_cliente.toUpperCase()}
               </div>
+              ${pedido.telefono_cliente ? `
+                <div style="font-size: 1.1em; margin-top: 4px;">
+                  📞 ${pedido.telefono_cliente}
+                </div>
+              ` : ''}
             </div>
             <p>
               <strong>Tipo entrega:</strong> 
