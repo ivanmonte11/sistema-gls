@@ -19,6 +19,7 @@ export interface Pedido {
     hora_entrega_solicitada: string | null;
     estado?: string;
     hora_entrega_real?: string | null;
+    impreso?: boolean;
   }
   
   export interface Estadisticas {

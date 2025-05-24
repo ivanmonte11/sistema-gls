@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Pedido {
   id: number;
@@ -26,6 +26,12 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [impreso, setImpreso] = useState(false);
+
+  // Caragamos el estado desde localstorage al montar el componente
+  useEffect(() => {
+    const yaImpreso = localStorage.getItem(`ticket_impreso_${pedido.numero_pedido}`);
+    setImpreso(yaImpreso === "true");
+  }, [pedido.numero_pedido]);
 
   const formatPrecio = (precio: number | string): string => {
     const numero = typeof precio === 'string' ? parseFloat(precio) : precio;
@@ -79,6 +85,10 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
       if (!result.success) {
         throw new Error(result.message || 'Error en la impresión');
       }
+
+      // Guarda en el localStorage como impreso
+      localStorage.setItem(`ticket_impreso_${pedido.numero_pedido}`, "tue");
+      setImpreso(true);
 
       setImpreso(true);
 
@@ -213,6 +223,8 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
       `);
       printWindow?.document.close();
       printWindow?.print();
+      localStorage.setItem(`ticket_impreso_${pedido.numero_pedido}`, "true");
+      setImpreso(true);
     } finally {
       setIsPrinting(false);
     }
