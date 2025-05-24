@@ -233,7 +233,7 @@ export function TicketPedido({ pedido }: { pedido: Pedido }) {
   return (
     <button
       onClick={imprimirTicket}
-      disabled={isPrinting || impreso}
+      disabled={isPrinting}
       className={`
         bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors 
         ${isPrinting ? 'opacity-50 cursor-not-allowed' : ''}
