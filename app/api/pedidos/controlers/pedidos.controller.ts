@@ -1,33 +1,42 @@
 import { NextResponse } from 'next/server';
-import { 
-  crearPedido, 
-  actualizarPedido, 
-  actualizarEstadoPedido, 
-  obtenerPedidos 
+import {
+  crearPedido,
+  actualizarPedido,
+  actualizarEstadoPedido,
+  obtenerPedidos,
+  obtenerPedidosPorCliente,
+  marcarPedidoComoImpreso, 
+
 } from '../services/pedidos.service';
 
-import  pool  from '@/lib/db';
-
+import pool from '@/lib/db';
 import { validarPedido, validarActualizacionEstado } from '../utils/validators.utils';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const clientId = searchParams.get('clientId'); // 👈 se obtiene el clientId si está presente
   const fecha = searchParams.get('fecha');
-  
+
   try {
-    const pedidos = await obtenerPedidos(fecha || undefined);
-    
+    let pedidos;
+
+    if (clientId) {
+      pedidos = await obtenerPedidosPorCliente(Number(clientId));
+    } else {
+      pedidos = await obtenerPedidos(fecha || undefined);
+    }
+
     return NextResponse.json({
       success: true,
       data: pedidos
     });
-    
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     console.error('Error en GET /api/pedidos:', errorMessage);
-    
+
     return NextResponse.json(
-      { 
+      {
         success: false,
         error: 'Error al obtener pedidos',
         details: process.env.NODE_ENV === 'development' ? errorMessage : null
@@ -133,8 +142,26 @@ export async function PATCH(request: Request) {
     }
 
     const data = await request.json();
+
+    // ✅ Manejar pedidos impresos directamente
+    if (data.impreso === true && typeof data.id === 'number') {
+      try {
+        await marcarPedidoComoImpreso(data.id);
+        return NextResponse.json({
+          success: true,
+          message: 'Pedido marcado como impreso'
+        });
+      } catch (err) {
+        console.error('Error al marcar como impreso:', err);
+        return NextResponse.json(
+          { success: false, error: 'No se pudo marcar como impreso' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // ✅ Validar y actualizar estado de pedido
     const { isValid, errors } = validarActualizacionEstado(data);
-    
     if (!isValid) {
       return NextResponse.json(
         { success: false, error: 'Datos inválidos', details: errors },
@@ -143,7 +170,7 @@ export async function PATCH(request: Request) {
     }
 
     const resultado = await actualizarEstadoPedido(data);
-    
+
     return NextResponse.json({
       success: true,
       message: 'Estado actualizado',
@@ -155,15 +182,16 @@ export async function PATCH(request: Request) {
     console.error('Error en PATCH /api/pedidos:', errorMessage);
 
     return NextResponse.json(
-      { 
+      {
         success: false,
-        error: 'Error al actualizar estado',
+        error: 'Error al actualizar estado o marcar como impreso',
         details: process.env.NODE_ENV === 'development' ? errorMessage : null
       },
       { status: 500 }
     );
   }
 }
+
 
 export async function PUT(request: Request) {
   try {

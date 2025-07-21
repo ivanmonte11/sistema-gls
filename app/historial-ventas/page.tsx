@@ -13,7 +13,7 @@ import { Pedido, Estadisticas } from './types/pedidos.types';
 export default function HistorialVentas() {
   // Estado
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState<'todos' | 'entregados'>('todos');
+  const [activeTab, setActiveTab] = useState<'todos' | 'entregados' | 'impresos'>('todos');
   const [pedidoAEditar, setPedidoAEditar] = useState<Pedido | null>(null);
   const [localPedidos, setLocalPedidos] = useState<Pedido[]>([]);
   const [localEntregados, setLocalEntregados] = useState<Pedido[]>([]);
@@ -102,6 +102,7 @@ export default function HistorialVentas() {
         pedidosEntregados={localEntregados}
         setPedidoAEditar={setPedidoAEditar}
         actualizarEstadoPedido={actualizarEstadoPedido}
+        onPedidoImpreso={reloadData}
       />
 
       {pedidoAEditar && (

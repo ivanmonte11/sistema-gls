@@ -224,7 +224,8 @@ export async function obtenerPedidos(fecha?: string) {
         precio_unitario, precio_total, fecha_pedido, estado,
         TO_CHAR(hora_entrega_real, 'HH24:MI') as hora_entrega_real,
         TO_CHAR(hora_entrega_solicitada, 'HH24:MI') as hora_entrega_solicitada,
-        TO_CHAR(hora_pedido, 'HH24:MI') as hora_pedido
+        TO_CHAR(hora_pedido, 'HH24:MI') as hora_pedido,
+        impreso
       FROM pedidos`;
     
     const params = [];
@@ -307,3 +308,49 @@ export async function generarNumeroPedido(client: any): Promise<string> {
   return numeroPedido;
 }
 
+export async function obtenerPedidosPorCliente(clientId: number) {
+  const client = await pool.connect();
+
+  try {
+    const query = `
+      SELECT 
+        id, numero_pedido, nombre_cliente, telefono_cliente, tipo_entrega, tipo_envio,
+        direccion, metodo_pago, con_chimichurri, con_papas, cantidad_papas, cantidad_pollo,
+        precio_unitario, precio_total, fecha_pedido, estado,
+        TO_CHAR(hora_entrega_real, 'HH24:MI') as hora_entrega_real,
+        TO_CHAR(hora_entrega_solicitada, 'HH24:MI') as hora_entrega_solicitada,
+        TO_CHAR(hora_pedido, 'HH24:MI') as hora_pedido,
+        impreso
+      FROM pedidos
+      WHERE client_id = $1
+      ORDER BY fecha_pedido DESC, hora_pedido DESC
+    `;
+
+    const result = await client.query(query, [clientId]);
+    return result.rows;
+  } catch (error) {
+    console.error('Error en obtenerPedidosPorCliente:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function marcarPedidoComoImpreso(id: number) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE pedidos SET impreso = true, fecha_actualizacion = NOW() WHERE id = $1`,
+      [id]
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al marcar pedido como impreso:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}

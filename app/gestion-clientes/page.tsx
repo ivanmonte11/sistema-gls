@@ -33,7 +33,7 @@ export default function GestionClientes() {
         `/api/clients?search=${searchTerm}&page=${pagination.page}&limit=${pagination.limit}`
       );
       const data = await res.json();
-      
+
       if (data.success) {
         setClients(data.data);
         setPagination(prev => ({
@@ -61,7 +61,7 @@ export default function GestionClientes() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6">Gestión de Clientes</h1>
-      
+
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-6">
           <form onSubmit={handleSearch} className="flex">
@@ -72,14 +72,14 @@ export default function GestionClientes() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="p-2 border rounded-l"
             />
-            <button 
+            <button
               type="submit"
               className="bg-blue-500 text-white p-2 rounded-r hover:bg-blue-600"
             >
               Buscar
             </button>
           </form>
-          
+
           <Link href="/gestion-clientes/nuevo">
             <button className="bg-green-500 text-white p-2 rounded hover:bg-green-600">
               Nuevo Cliente
@@ -114,11 +114,18 @@ export default function GestionClientes() {
                       <td className="py-2 px-4">{client.address || '-'}</td>
                       <td className="py-2 px-4">{formatDate(client.created_at)}</td>
                       <td className="py-2 px-4">
-                        <Link href={`/gestion-clientes/${client.id}`}>
-                          <button className="text-blue-500 hover:text-blue-700 mr-2">
-                            Editar
-                          </button>
-                        </Link>
+                        <div className="flex gap-2">
+                          <Link href={`/gestion-clientes/${client.id}`}>
+                            <button className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">
+                              Editar
+                            </button>
+                          </Link>
+                          <Link href={`/gestion-clientes/${client.id}/historial`}>
+                            <button className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600">
+                              Ver Historial
+                            </button>
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
