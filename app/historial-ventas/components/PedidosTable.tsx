@@ -39,10 +39,10 @@ export const PedidosTable = ({
       activeTab === 'todos'
         ? pedidos
         : activeTab === 'entregados'
-        ? pedidosEntregados
-        : activeTab === 'impresos'
-        ? pedidos.filter(p => p.impreso)
-        : pedidos;
+          ? pedidosEntregados
+          : activeTab === 'impresos'
+            ? pedidos.filter(p => !p.impreso)
+            : pedidos;
 
     if (!searchTerm) return currentPedidos;
 
@@ -74,7 +74,7 @@ export const PedidosTable = ({
             className={`py-2 px-4 font-medium ${activeTab === 'impresos' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
             onClick={() => setActiveTab('impresos')}
           >
-            Pedidos Impresos
+            Pedidos No Impresos
           </button>
         </div>
 
@@ -145,7 +145,7 @@ export const PedidosTable = ({
                     <div className="flex flex-col space-y-2">
                       <TicketPedido pedido={pedido}
                         onPedidoImpreso={onPedidoImpreso}
-                       />
+                      />
 
                       <button
                         onClick={() => setPedidoAEditar(pedido)}
@@ -154,19 +154,19 @@ export const PedidosTable = ({
                         Editar
                       </button>
 
-                      {pedido.impreso && (
-                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                          🖨️ Impreso
+                      {!pedido.impreso && (
+                        <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">
+                          🖨️ No impreso
                         </span>
                       )}
 
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        pedido.estado === 'entregado'
+
+                      <span className={`px-2 py-1 rounded-full text-xs ${pedido.estado === 'entregado'
                           ? 'bg-green-100 text-green-800'
                           : pedido.estado === 'cancelado'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
                         {pedido.estado}
                       </span>
 
@@ -199,8 +199,8 @@ export const PedidosTable = ({
             )}
           </tbody>
         </table>
-    
-    </div>
-  </>
-);
+
+      </div>
+    </>
+  );
 };
