@@ -6,15 +6,13 @@ import {
   obtenerPedidos,
   obtenerPedidosPorCliente,
   marcarPedidoComoImpreso, 
-
 } from '../services/pedidos.service';
-
 import pool from '@/lib/db';
 import { validarPedido, validarActualizacionEstado } from '../utils/validators.utils';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const clientId = searchParams.get('clientId'); // 👈 se obtiene el clientId si está presente
+  const clientId = searchParams.get('clientId');
   const fecha = searchParams.get('fecha');
 
   try {
@@ -47,10 +45,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const client = await pool.connect(); // Obtenemos una conexión del pool
+  const client = await pool.connect();
   
   try {
-    await client.query('BEGIN'); // Iniciamos transacción
+    await client.query('BEGIN');
 
     console.log('→ Iniciando POST /api/pedidos');
 
@@ -68,51 +66,49 @@ export async function POST(request: Request) {
       throw new Error(`Datos inválidos: ${JSON.stringify(errors)}`);
     }
 
-    // Procesamiento del cliente
-let clientId: number | null = null;
+    // Procesamiento del cliente - MODIFICADO PARA CLIENTES EVENTUALES
+    let clientId: number | null = null;
 
-// Crear cliente si hay nombre (teléfono es opcional)
-if (data.nombre) {
-  // Buscar por teléfono si existe, sino por nombre
-  const searchQuery = data.telefono 
-    ? 'SELECT id FROM clients WHERE phone = $1 LIMIT 1'
-    : 'SELECT id FROM clients WHERE name = $1 LIMIT 1';
-  
-  const searchValue = data.telefono || data.nombre;
+    if (!data.clienteEventual && data.nombre) {
+      // Buscar por teléfono si existe, sino por nombre
+      const searchQuery = data.telefono 
+        ? 'SELECT id FROM clients WHERE phone = $1 LIMIT 1'
+        : 'SELECT id FROM clients WHERE name = $1 LIMIT 1';
+      
+      const searchValue = data.telefono || data.nombre;
 
-  const clientResult = await client.query(searchQuery, [searchValue]);
+      const clientResult = await client.query(searchQuery, [searchValue]);
 
-  if (clientResult.rows.length === 0) {
-    // Crear nuevo cliente
-    const newClient = await client.query(
-      'INSERT INTO clients (name, phone, address) VALUES ($1, $2, $3) RETURNING id',
-      [data.nombre, data.telefono || null, data.direccion || null]
-    );
-    clientId = newClient.rows[0].id;
-    console.log('Nuevo cliente creado con ID:', clientId);
-  } else {
-    clientId = clientResult.rows[0].id;
-    console.log('Cliente existente encontrado:', clientId);
-  }
-}
+      if (clientResult.rows.length === 0) {
+        // Crear nuevo cliente solo si no es eventual
+        const newClient = await client.query(
+          'INSERT INTO clients (name, phone, address) VALUES ($1, $2, $3) RETURNING id',
+          [data.nombre, data.telefono || null, data.direccion || null]
+        );
+        clientId = newClient.rows[0].id;
+        console.log('Nuevo cliente creado con ID:', clientId);
+      } else {
+        clientId = clientResult.rows[0].id;
+        console.log('Cliente existente encontrado:', clientId);
+      }
+    }
 
-    // Crear el pedido pasando el client y los datos
+    // Crear el pedido
     const resultado = await crearPedido(client, {
       ...data,
-      client_id: clientId
+      client_id: clientId,
+      clienteEventual: data.clienteEventual || false
     });
 
     await client.query('COMMIT');
 
-
-  // Devuelve la respuesta así (sin spread):
-return NextResponse.json({
-  success: true,
-  message: 'Pedido registrado con éxito',
-  pedidoId: resultado.pedidoId,      // Accede directamente a las propiedades
-  numeroPedido: resultado.numeroPedido,
-  total: resultado.total
-});
+    return NextResponse.json({
+      success: true,
+      message: 'Pedido registrado con éxito',
+      pedidoId: resultado.pedidoId,
+      numeroPedido: resultado.numeroPedido,
+      total: resultado.total
+    });
 
   } catch (error) {
     await client.query('ROLLBACK');
@@ -128,7 +124,7 @@ return NextResponse.json({
       { status: 500 }
     );
   } finally {
-    client.release(); // Siempre liberamos la conexión
+    client.release();
   }
 }
 

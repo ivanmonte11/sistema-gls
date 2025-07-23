@@ -34,6 +34,7 @@ export interface Pedido {
     cantidadPollo: number;
     precioUnitario: number;
     horaEntrega: string;
+    clienteEventual?: boolean;
     client_id?: number | null;
   }
   
@@ -44,7 +45,7 @@ export interface Pedido {
     total: number;
   }
   export interface PedidoUpdateRequest extends PedidoCreateRequest {
-    id: number;
+    id: number | string;
   }
   
   export interface PedidoUpdateStatusRequest {

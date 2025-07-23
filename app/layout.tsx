@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Sistema de Pedidos',
@@ -15,34 +16,25 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="bg-gray-100 relative min-h-screen">
-        {/* Logo de fondo */}
-        <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0">
-  <div className="relative w-full max-w-[min(90vw,1200px)] h-[min(80vh,800px)] opacity-10">
-    <Image
-      src="/logo.png" 
-      alt="Logo Granja la Colonia"
-      fill
-      className="object-contain"
-      priority
-      quality={100}
-    />
-  </div>
-</div>
-
-        {/* Contenido principal */}
-        <div className="relative z-10 min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col">
           {/* Header */}
           <header className="bg-primary text-white p-4">
-            <div className="container mx-auto flex items-center">
-              <div className="mr-4">
-                <Image 
+            <div className="container mx-auto flex items-center gap-4">
+              {/* Logo clickeable */}
+              <Link
+                href="https://sistema-gls.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:opacity-80 transition-opacity"
+              >
+                <Image
                   src="/logo.png"
                   alt="Logo Granja la Colonia"
                   width={60}
                   height={60}
-                  className="rounded-full"
+                  className="rounded-full cursor-pointer"
                 />
-              </div>
+              </Link>
               <h1 className="text-2xl font-bold">Sistema de Pedidos</h1>
             </div>
           </header>
@@ -53,11 +45,9 @@ export default function RootLayout({
           </main>
 
           {/* Footer */}
-          <footer className="bg-primary text-white p-4 mt-auto">
+          <footer className="bg-primary text-white p-4">
             <div className="container mx-auto text-center">
               <p>Granja la Colonia.</p>
-            </div>
-            <div className="container mx-auto text-center">
               <p>© {new Date().getFullYear()} Desarrollado por MonteStack | Todos los derechos reservados</p>
             </div>
           </footer>

@@ -6,7 +6,6 @@ import {
   PedidoCreateResponse 
 } from '../types/pedidos.types';
 import { calcularPrecioTotal } from './precios.service';
-import { generarNumeroPedido as generarNumeroPedidoImportado } from './pedidos.service';  // Renombramos la importación
 import { TIMEZONE } from '../utils/fecha.utils';
 
 export async function crearPedido(
@@ -23,22 +22,22 @@ export async function crearPedido(
         tipo_entrega, tipo_envio, direccion, metodo_pago,
         con_chimichurri, con_papas, cantidad_papas, cantidad_pollo,
         precio_unitario, precio_total, fecha, hora_pedido, fecha_pedido,
-        hora_entrega_solicitada, estado
+        hora_entrega_solicitada, estado, cliente_eventual
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
         NOW() AT TIME ZONE $15,
         (NOW() AT TIME ZONE $15)::time,
         (NOW() AT TIME ZONE $15)::date,
-        $16, 'pendiente'
+        $16, 'pendiente', $17
       )
       RETURNING id, numero_pedido
     `;
 
     const result = await client.query(query, [
-      data.client_id ?? null,  // Manejo de null seguro
+      data.clienteEventual ? null : (data.client_id || null),
       numeroPedido,
       data.nombre,
-      data.telefono || null,
+      data.clienteEventual ? null : (data.telefono || null),
       data.tipoEntrega,
       data.tipoEntrega === 'envio' ? data.tipoEnvio : null,
       data.tipoEntrega === 'envio' ? data.direccion : null,
@@ -50,7 +49,8 @@ export async function crearPedido(
       data.precioUnitario,
       precioTotal,
       TIMEZONE,
-      data.horaEntrega
+      data.horaEntrega,
+      data.clienteEventual || false
     ]);
 
     // Actualizar stock
@@ -70,6 +70,7 @@ export async function crearPedido(
     throw error;
   }
 }
+
 export async function actualizarPedido(data: PedidoUpdateRequest) {
   const client = await pool.connect();
   
@@ -78,7 +79,7 @@ export async function actualizarPedido(data: PedidoUpdateRequest) {
 
     // Obtener pedido actual
     const pedidoActual = await client.query(
-      `SELECT cantidad_pollo, estado FROM pedidos WHERE id = $1 FOR UPDATE`,
+      `SELECT cantidad_pollo, estado, cliente_eventual FROM pedidos WHERE id = $1 FOR UPDATE`,
       [data.id]
     );
 
@@ -88,6 +89,7 @@ export async function actualizarPedido(data: PedidoUpdateRequest) {
 
     const cantidadAnterior = parseFloat(pedidoActual.rows[0].cantidad_pollo);
     const estadoActual = pedidoActual.rows[0].estado;
+    const esClienteEventual = pedidoActual.rows[0].cliente_eventual;
 
     if (['entregado', 'cancelado'].includes(estadoActual)) {
       throw new Error(`No se puede editar un pedido ${estadoActual}`);
@@ -114,19 +116,37 @@ export async function actualizarPedido(data: PedidoUpdateRequest) {
     // Actualizar pedido
     const result = await client.query(
       `UPDATE pedidos SET
-        nombre_cliente = $1, telefono_cliente = $2, tipo_entrega = $3, tipo_envio = $4,
-        direccion = $5, metodo_pago = $6, con_chimichurri = $7, con_papas = $8,
-        cantidad_papas = $9, cantidad_pollo = $10, precio_unitario = $11, precio_total = $12,
-        hora_entrega_solicitada = $13, fecha_actualizacion = NOW() AT TIME ZONE $14
+        nombre_cliente = $1, 
+        telefono_cliente = $2, 
+        tipo_entrega = $3, 
+        tipo_envio = $4,
+        direccion = $5, 
+        metodo_pago = $6, 
+        con_chimichurri = $7, 
+        con_papas = $8,
+        cantidad_papas = $9, 
+        cantidad_pollo = $10, 
+        precio_unitario = $11, 
+        precio_total = $12,
+        hora_entrega_solicitada = $13, 
+        fecha_actualizacion = NOW() AT TIME ZONE $14
       WHERE id = $15 RETURNING *`,
       [
-        data.nombre, data.telefono || null, data.tipoEntrega,
+        data.nombre, 
+        esClienteEventual ? null : (data.telefono || null),
+        data.tipoEntrega,
         data.tipoEntrega === 'envio' ? data.tipoEnvio : null,
         data.tipoEntrega === 'envio' ? data.direccion : null,
-        data.metodoPago, data.conChimichurri || false,
-        data.conPapas || false, data.conPapas ? (data.cantidadPapas || 0) : 0,
-        data.cantidadPollo, data.precioUnitario, precioTotal,
-        data.horaEntrega, TIMEZONE, data.id.toString()  // Aseguramos que 'id' sea un string
+        data.metodoPago, 
+        data.conChimichurri || false,
+        data.conPapas || false, 
+        data.conPapas ? (data.cantidadPapas || 0) : 0,
+        data.cantidadPollo, 
+        data.precioUnitario, 
+        precioTotal,
+        data.horaEntrega, 
+        TIMEZONE, 
+        data.id
       ]
     );
 
@@ -161,7 +181,7 @@ export async function actualizarPedido(data: PedidoUpdateRequest) {
   }
 }
 
-export async function actualizarEstadoPedido(data: { id: number; estado: string }) {
+export async function actualizarEstadoPedido(data: { id: number | string; estado: string }) {
   const client = await pool.connect();
   
   try {
@@ -190,7 +210,7 @@ export async function actualizarEstadoPedido(data: { id: number; estado: string 
     }
 
     query += ' WHERE id = $' + (params.length + 1) + ' RETURNING *';
-    params.push(data.id.toString());  // Convertimos 'id' a string
+    params.push(data.id.toString());
 
     const result = await client.query(query, params);
 
@@ -219,34 +239,42 @@ export async function obtenerPedidos(fecha?: string) {
   try {
     let query = `
       SELECT 
-        id, numero_pedido, nombre_cliente, telefono_cliente, tipo_entrega, tipo_envio,
-        direccion, metodo_pago, con_chimichurri, con_papas, cantidad_papas, cantidad_pollo,
-        precio_unitario, precio_total, fecha_pedido, estado,
-        TO_CHAR(hora_entrega_real, 'HH24:MI') as hora_entrega_real,
-        TO_CHAR(hora_entrega_solicitada, 'HH24:MI') as hora_entrega_solicitada,
-        TO_CHAR(hora_pedido, 'HH24:MI') as hora_pedido,
-        impreso
-      FROM pedidos`;
+        p.id, p.numero_pedido, p.nombre_cliente, p.telefono_cliente, 
+        p.tipo_entrega, p.tipo_envio, p.direccion, p.metodo_pago,
+        p.con_chimichurri, p.con_papas, p.cantidad_papas, p.cantidad_pollo,
+        p.precio_unitario, p.precio_total, p.fecha_pedido, p.estado, 
+        p.cliente_eventual,
+        TO_CHAR(p.hora_entrega_real, 'HH24:MI') as hora_entrega_real,
+        TO_CHAR(p.hora_entrega_solicitada, 'HH24:MI') as hora_entrega_solicitada,
+        TO_CHAR(p.hora_pedido, 'HH24:MI') as hora_pedido,
+        p.impreso,
+        CASE 
+          WHEN p.cliente_eventual THEN 'Cliente Eventual' 
+          ELSE c.name 
+        END as nombre_cliente_completo,
+        c.id as client_id
+      FROM pedidos p
+      LEFT JOIN clients c ON p.client_id = c.id`;
     
     const params = [];
     
     if (fecha) {
-      query += ` WHERE fecha_pedido = $1`;
+      query += ` WHERE p.fecha_pedido = $1`;
       params.push(fecha);
     }
     
     query += ` ORDER BY 
       CASE 
-        WHEN estado = 'entregado' THEN 1
-        WHEN estado = 'cancelado' THEN 2
+        WHEN p.estado = 'entregado' THEN 1
+        WHEN p.estado = 'cancelado' THEN 2
         ELSE 0
       END,
       CASE 
-        WHEN hora_entrega_solicitada IS NULL THEN 1
+        WHEN p.hora_entrega_solicitada IS NULL THEN 1
         ELSE 0
       END,
-      hora_entrega_solicitada ASC,
-      hora_pedido ASC`;
+      p.hora_entrega_solicitada ASC,
+      p.hora_pedido ASC`;
 
     const result = await client.query(query, params);
     
@@ -257,8 +285,6 @@ export async function obtenerPedidos(fecha?: string) {
     client.release();
   }
 }
-
-// pedidos.service.ts
 
 export async function generarNumeroPedido(client: any): Promise<string> {
   const ahora = new Date();
@@ -295,7 +321,7 @@ export async function generarNumeroPedido(client: any): Promise<string> {
 
   const numeroPedido = `P-${hoyFormatoLocal}-${siguienteNumero.toString().padStart(3, '0')}`;
 
-  // Verificar si el número ya existe (caso muy raro, pero seguro)
+  // Verificar si el número ya existe
   const existe = await client.query(
     `SELECT 1 FROM pedidos WHERE numero_pedido = $1 LIMIT 1`,
     [numeroPedido]
@@ -314,16 +340,18 @@ export async function obtenerPedidosPorCliente(clientId: number) {
   try {
     const query = `
       SELECT 
-        id, numero_pedido, nombre_cliente, telefono_cliente, tipo_entrega, tipo_envio,
-        direccion, metodo_pago, con_chimichurri, con_papas, cantidad_papas, cantidad_pollo,
-        precio_unitario, precio_total, fecha_pedido, estado,
-        TO_CHAR(hora_entrega_real, 'HH24:MI') as hora_entrega_real,
-        TO_CHAR(hora_entrega_solicitada, 'HH24:MI') as hora_entrega_solicitada,
-        TO_CHAR(hora_pedido, 'HH24:MI') as hora_pedido,
-        impreso
-      FROM pedidos
-      WHERE client_id = $1
-      ORDER BY fecha_pedido DESC, hora_pedido DESC
+        p.id, p.numero_pedido, p.nombre_cliente, p.telefono_cliente, 
+        p.tipo_entrega, p.tipo_envio, p.direccion, p.metodo_pago,
+        p.con_chimichurri, p.con_papas, p.cantidad_papas, p.cantidad_pollo,
+        p.precio_unitario, p.precio_total, p.fecha_pedido, p.estado,
+        p.cliente_eventual,
+        TO_CHAR(p.hora_entrega_real, 'HH24:MI') as hora_entrega_real,
+        TO_CHAR(p.hora_entrega_solicitada, 'HH24:MI') as hora_entrega_solicitada,
+        TO_CHAR(p.hora_pedido, 'HH24:MI') as hora_pedido,
+        p.impreso
+      FROM pedidos p
+      WHERE p.client_id = $1
+      ORDER BY p.fecha_pedido DESC, p.hora_pedido DESC
     `;
 
     const result = await client.query(query, [clientId]);
