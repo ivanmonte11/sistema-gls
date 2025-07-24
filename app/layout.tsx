@@ -23,7 +23,6 @@ export default function RootLayout({
               {/* Logo clickeable */}
               <Link
                 href="https://sistema-gls.vercel.app/"
-                target="_blank"
                 rel="noopener noreferrer"
                 className="hover:opacity-80 transition-opacity"
               >
