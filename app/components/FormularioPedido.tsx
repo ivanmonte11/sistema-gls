@@ -1,43 +1,40 @@
 "use client";
 import { useState, useEffect } from 'react';
 
-const formatNumber = (num: number) => {
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-};
-
-const TablaStock = ({ stock, precio }: { stock: number; precio: number }) => {
-  return (
-    <div className="grid grid-cols-2 gap-4 mb-4">
-      <div>
-        <p className="text-gray-600">Stock disponible:</p>
-        <p className="font-bold">{formatNumber(stock)} unidades</p>
-      </div>
-      <div>
-        <p className="text-gray-600">Precio unitario:</p>
-        <p className="font-bold text-green-600">${formatNumber(precio)}</p>
-      </div>
-    </div>
-  );
-};
-
-type StockData = {
+interface ProductoStock {
+  id: number;
+  producto: string;
   cantidad: number;
-  precio: number;
-};
+  precio: number | null;
+  tipo_medida: string;
+  categoria: string | null;
+  activo: boolean;
+}
 
-type PreciosConfig = {
-  medio_pollo_recargo: number;
-  papas_precio: number;
-  envio_cercano: number;
-  envio_lejano: number;
-  envio_la_banda: number;
-};
-
-type Cliente = {
+interface Cliente {
   id: number;
   name: string;
   phone?: string;
   address?: string;
+}
+
+interface ItemPedido {
+  producto_id: number;
+  producto_nombre: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+  tipo_medida: string;
+}
+
+interface PreciosConfig {
+  envio_cercano: number;
+  envio_lejano: number;
+  envio_la_banda: number;
+}
+
+const formatNumber = (num: number) => {
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 };
 
 export default function FormularioPedido() {
@@ -49,6 +46,12 @@ export default function FormularioPedido() {
   const [cargandoClientes, setCargandoClientes] = useState(false);
   const [clienteEventual, setClienteEventual] = useState<boolean>(false);
 
+  // Estados para productos
+  const [productos, setProductos] = useState<ProductoStock[]>([]);
+  const [itemsPedido, setItemsPedido] = useState<ItemPedido[]>([]);
+  const [productoSeleccionado, setProductoSeleccionado] = useState<string>('');
+  const [cantidadProducto, setCantidadProducto] = useState<number>(1);
+
   // Resto de estados del formulario
   const [telefono, setTelefono] = useState<string>('');
   const [numeroPedido, setNumeroPedido] = useState<string>('');
@@ -57,21 +60,36 @@ export default function FormularioPedido() {
   const [direccion, setDireccion] = useState<string>('');
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'debito' | 'credito' | 'transferencia'>('efectivo');
   const [conChimichurri, setConChimichurri] = useState<boolean>(false);
-  const [conPapas, setConPapas] = useState<boolean>(false);
-  const [cantidadPapas, setCantidadPapas] = useState<number>(0);
-  const [cantidadPollo, setCantidadPollo] = useState<number | ''>('');
   const [horaEntrega, setHoraEntrega] = useState<string>('');
-  const [precioUnitario, setPrecioUnitario] = useState<number>(20000);
   const [precioFinal, setPrecioFinal] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [stockData, setStockData] = useState<StockData>({ cantidad: 0, precio: 20000 });
   const [preciosConfig, setPreciosConfig] = useState<PreciosConfig>({
-    medio_pollo_recargo: 1000,
-    papas_precio: 4000,
     envio_cercano: 1500,
     envio_lejano: 2500,
     envio_la_banda: 3000
   });
+
+  // Cargar productos y configuraciones
+  useEffect(() => {
+    obtenerProductos();
+    obtenerPrecios();
+    checkAndResetSequence();
+
+    const ahora = new Date();
+    ahora.setHours(ahora.getHours() + 1);
+    const hora = ahora.getHours().toString().padStart(2, '0');
+    const minutos = ahora.getMinutes().toString().padStart(2, '0');
+    setHoraEntrega(`${hora}:${minutos}`);
+  }, []);
+
+  // Calcular precio total cuando cambian los items o el envío
+ // Calcular precio total cuando cambian los items o el envío
+useEffect(() => {
+  console.log('🔄 useEffect - Recalculando precio...');
+  console.log('📋 Items en estado:', itemsPedido);
+  console.log('🚚 Tipo entrega:', tipoEntrega);
+  calcularPrecioTotal();
+}, [itemsPedido, tipoEntrega, tipoEnvio]);
 
   // Cargar clientes al buscar
   useEffect(() => {
@@ -80,9 +98,10 @@ export default function FormularioPedido() {
         setCargandoClientes(true);
         try {
           const res = await fetch(`/api/clients?search=${encodeURIComponent(busquedaCliente)}&autocomplete=true`);
-          const data = await res.json();
-          setClientesSugeridos(data);
-          setMostrarSugerencias(true);
+          if (res.ok) {
+            const clientes = await res.json(); // Array directo
+            setClientesSugeridos(clientes);
+          }
         } catch (error) {
           console.error("Error buscando clientes:", error);
         } finally {
@@ -108,37 +127,15 @@ export default function FormularioPedido() {
     }
   }, [cliente, clienteEventual]);
 
-  // Efectos existentes
-  useEffect(() => {
-    obtenerStock();
-    obtenerPrecios();
-    checkAndResetSequence();
-    
-    const ahora = new Date();
-    ahora.setHours(ahora.getHours() + 1);
-    const hora = ahora.getHours().toString().padStart(2, '0');
-    const minutos = ahora.getMinutes().toString().padStart(2, '0');
-    setHoraEntrega(`${hora}:${minutos}`);
-  }, []);
-
-  useEffect(() => {
-    if (typeof cantidadPollo === 'number' && cantidadPollo > 0) {
-      calcularPrecio();
-    } else {
-      setPrecioFinal(0);
-    }
-  }, [cantidadPollo, tipoEntrega, tipoEnvio, conPapas, cantidadPapas, preciosConfig]);
-
-  const obtenerStock = async () => {
+  const obtenerProductos = async () => {
     try {
       const res = await fetch('/api/stock');
       if (res.ok) {
-        const data: StockData = await res.json();
-        setStockData(data);
-        setPrecioUnitario(data.precio || 20000);
+        const data = await res.json();
+        setProductos(data.filter((p: ProductoStock) => p.activo && p.precio));
       }
     } catch (error) {
-      console.error('Error obteniendo stock:', error);
+      console.error('Error obteniendo productos:', error);
     }
   };
 
@@ -163,30 +160,95 @@ export default function FormularioPedido() {
     }
   };
 
-  const calcularPrecio = () => {
-    let total = 0;
-    const cantidadEntera = Math.floor(cantidadPollo as number);
-    const tieneMedioPollo = (cantidadPollo as number) % 1 !== 0;
+  const agregarProducto = () => {
+  if (!productoSeleccionado || cantidadProducto <= 0) return;
 
-    total += cantidadEntera * precioUnitario;
+  console.log('🔄 Agregando producto...');
+  console.log('🎯 Producto seleccionado ID:', productoSeleccionado);
+  console.log('🎯 Cantidad:', cantidadProducto);
 
-    if (tieneMedioPollo) {
-      total += (precioUnitario / 2) + preciosConfig.medio_pollo_recargo;
+  const producto = productos.find(p => p.id === parseInt(productoSeleccionado));
+  console.log('🔍 Producto encontrado:', producto);
+
+  if (!producto || !producto.precio) return;
+
+  // Verificar stock
+  if (cantidadProducto > producto.cantidad) {
+    alert(`Stock insuficiente. Disponible: ${producto.cantidad} ${getLabelTipoMedida(producto.tipo_medida)}`);
+    return;
+  }
+
+  const nuevoItem: ItemPedido = {
+    producto_id: producto.id,
+    producto_nombre: producto.producto,
+    cantidad: cantidadProducto,
+    precio_unitario: producto.precio,
+    subtotal: producto.precio * cantidadProducto,
+    tipo_medida: producto.tipo_medida
+  };
+
+  console.log('➕ Nuevo item:', nuevoItem);
+
+  setItemsPedido([...itemsPedido, nuevoItem]);
+  setProductoSeleccionado('');
+  setCantidadProducto(1);
+};
+
+  const eliminarProducto = (index: number) => {
+    const nuevosItems = [...itemsPedido];
+    nuevosItems.splice(index, 1);
+    setItemsPedido(nuevosItems);
+  };
+
+ const calcularPrecioTotal = () => {
+  // Calcular subtotal de todos los productos
+  console.log('🔍 ITEMS_PEDIDO:', itemsPedido); // ← VER QUÉ HAY EN itemsPedido
+
+  let subtotal = itemsPedido.reduce((total, item) => {
+    console.log('📊 Item:', item.producto_nombre, 'Cantidad:', item.cantidad, 'Precio:', item.precio_unitario, 'Subtotal:', item.subtotal);
+    return total + item.subtotal;
+  }, 0);
+
+  console.log('📦 Subtotal productos:', subtotal);
+
+  let costoEnvio = 0;
+
+  if (tipoEntrega === 'envio') {
+    switch(tipoEnvio) {
+      case 'cercano':
+        costoEnvio = preciosConfig.envio_cercano;
+        break;
+      case 'lejano':
+        costoEnvio = preciosConfig.envio_lejano;
+        break;
+      case 'la_banda':
+        costoEnvio = preciosConfig.envio_la_banda;
+        break;
+      case 'gratis':
+        costoEnvio = 0;
+        break;
     }
+  }
 
-    if (tipoEntrega === 'envio') {
-      switch(tipoEnvio) {
-        case 'cercano': total += preciosConfig.envio_cercano; break;
-        case 'lejano': total += preciosConfig.envio_lejano; break;
-        case 'la_banda': total += preciosConfig.envio_la_banda; break;
-      }
-    }
+  console.log('🚚 Costo envío:', costoEnvio);
+  console.log('🎯 Tipo entrega:', tipoEntrega, 'Tipo envío:', tipoEnvio);
 
-    if (conPapas && cantidadPapas > 0) {
-      total += cantidadPapas * preciosConfig.papas_precio;
-    }
+  const total = subtotal + costoEnvio;
+  console.log('💰 Total final:', total);
 
-    setPrecioFinal(Math.round(total));
+  setPrecioFinal(total);
+};
+
+  const getLabelTipoMedida = (tipo: string) => {
+    const labels: { [key: string]: string } = {
+      unidad: 'unidades',
+      kilo: 'kg',
+      gramo: 'g',
+      litro: 'L',
+      docena: 'docenas',
+      porcion: 'porciones'
+    };
+    return labels[tipo] || tipo;
   };
 
   const checkAndResetSequence = () => {
@@ -206,8 +268,8 @@ export default function FormularioPedido() {
 
   const generateDisplayNumber = (sequence: number) => {
     const hoy = new Date();
-    const fechaStr = `${hoy.getFullYear()}-${(hoy.getMonth()+1).toString().padStart(2,'0')}-${hoy.getDate().toString().padStart(2,'0')}`;
-    const numeroMostrar = `${fechaStr}-${sequence.toString().padStart(3,'0')}`;
+    const fechaStr = `${hoy.getFullYear()}-${(hoy.getMonth() + 1).toString().padStart(2, '0')}-${hoy.getDate().toString().padStart(2, '0')}`;
+    const numeroMostrar = `${fechaStr}-${sequence.toString().padStart(3, '0')}`;
     setNumeroPedido(numeroMostrar);
   };
 
@@ -224,29 +286,24 @@ export default function FormularioPedido() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!clienteEventual && !cliente && !busquedaCliente.trim()) {
       alert('Debe seleccionar o ingresar un cliente');
       return;
     }
-  
-    if (cantidadPollo === '' || cantidadPollo <= 0) {
-      alert('La cantidad debe ser mayor a 0');
+
+    if (itemsPedido.length === 0) {
+      alert('Debe agregar al menos un producto al pedido');
       return;
     }
-  
-    if (cantidadPollo > stockData.cantidad) {
-      alert(`Stock insuficiente. Disponible: ${formatNumber(stockData.cantidad)}`);
-      return;
-    }
-  
+
     if (tipoEntrega === 'envio' && !direccion.trim()) {
       alert('Ingrese la dirección de envío');
       return;
     }
-  
+
     setIsLoading(true);
-    
+
     try {
       const response = await fetch('/api/pedidos', {
         method: 'POST',
@@ -262,28 +319,25 @@ export default function FormularioPedido() {
           direccion: tipoEntrega === 'envio' ? direccion : null,
           metodoPago,
           conChimichurri,
-          conPapas,
-          cantidadPapas: conPapas ? cantidadPapas : 0,
-          cantidadPollo,
-          precioUnitario,
+          items: itemsPedido,
           precioTotal: precioFinal,
           horaEntrega,
           clienteEventual
         }),
       });
-  
+
       const result = await response.json();
-  
+
       if (!response.ok) {
         throw new Error(result.error || 'Error al registrar pedido');
       }
 
       const currentSequence = parseInt(localStorage.getItem('currentSequence') || '0');
       localStorage.setItem('currentSequence', (currentSequence + 1).toString());
-      
+
       alert('Pedido registrado con éxito');
       resetForm();
-  
+
     } catch (error) {
       console.error('Error:', error);
       alert(error instanceof Error ? error.message : 'Error desconocido al registrar pedido');
@@ -297,38 +351,19 @@ export default function FormularioPedido() {
     setBusquedaCliente('');
     setClienteEventual(false);
     setTelefono('');
-    setCantidadPollo('');
+    setItemsPedido([]);
     setConChimichurri(false);
-    setConPapas(false);
-    setCantidadPapas(0);
     setTipoEntrega('retira');
     setDireccion('');
-    obtenerStock();
+    obtenerProductos();
     checkAndResetSequence();
   };
 
-  const handleCantidadPolloChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '') {
-      setCantidadPollo('');
-    } else {
-      const numValue = parseFloat(value);
-      if (!isNaN(numValue)) {
-        setCantidadPollo(numValue);
-      }
-    }
-  };
-
   return (
-    <div className="max-w-md mx-auto p-4">
-      <div className="bg-white p-4 mb-6 rounded-lg shadow">
-        <h2 className="text-xl font-bold mb-2">Stock Disponible</h2>
-        <TablaStock stock={stockData.cantidad} precio={precioUnitario} />
-      </div>
+    <div className="max-w-2xl mx-auto p-4">
+      <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
+        <h2 className="text-2xl font-bold mb-6">Nuevo Pedido</h2>
 
-      <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-bold mb-4">Nuevo Pedido</h2>
-        
         {/* Selector de cliente */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -404,15 +439,15 @@ export default function FormularioPedido() {
               </div>
 
               {cargandoClientes && (
-                <div className="absolute right-2 top-8">
+                <div className="absolute right-2 top-2">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
                 </div>
               )}
-              
+
               {mostrarSugerencias && clientesSugeridos.length > 0 && (
                 <ul className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-auto">
                   {clientesSugeridos.map((cliente) => (
-                    <li 
+                    <li
                       key={cliente.id}
                       onClick={() => {
                         setCliente(cliente);
@@ -469,9 +504,82 @@ export default function FormularioPedido() {
             onChange={(e) => setHoraEntrega(e.target.value)}
             className="w-full p-2 border rounded"
           />
-          <p className="text-sm text-gray-500 mt-1">
-            Los pedidos se preparan según la hora de entrega solicitada (más temprano = mayor prioridad)
-          </p>
+        </div>
+
+        {/* Selección de productos */}
+        <div className="space-y-4">
+          <label className="block text-gray-700 font-semibold">Productos del Pedido</label>
+
+          <div className="flex gap-2">
+            <select
+              value={productoSeleccionado}
+              onChange={(e) => setProductoSeleccionado(e.target.value)}
+              className="flex-1 p-2 border rounded"
+            >
+              <option value="">Seleccionar producto</option>
+              {productos.map(producto => (
+                <option key={producto.id} value={producto.id}>
+                  {producto.producto} - ${formatNumber(producto.precio || 0)}/{getLabelTipoMedida(producto.tipo_medida)}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="number"
+              value={cantidadProducto}
+              onChange={(e) => setCantidadProducto(Number(e.target.value))}
+              min="1"
+              step="0.1"
+              className="w-20 p-2 border rounded"
+              placeholder="Cant."
+            />
+
+            <button
+              type="button"
+              onClick={agregarProducto}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+            >
+              Agregar
+            </button>
+          </div>
+
+          {/* Lista de productos agregados */}
+          {itemsPedido.length > 0 && (
+            <div className="border rounded">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="p-2 text-left">Producto</th>
+                    <th className="p-2 text-left">Cantidad</th>
+                    <th className="p-2 text-left">Precio</th>
+                    <th className="p-2 text-left">Subtotal</th>
+                    <th className="p-2 text-left"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itemsPedido.map((item, index) => (
+                    <tr key={index} className="border-t">
+                      <td className="p-2">{item.producto_nombre}</td>
+                      <td className="p-2">
+                        {item.cantidad} {getLabelTipoMedida(item.tipo_medida)}
+                      </td>
+                      <td className="p-2">${formatNumber(item.precio_unitario)}</td>
+                      <td className="p-2">${formatNumber(item.subtotal)}</td>
+                      <td className="p-2">
+                        <button
+                          type="button"
+                          onClick={() => eliminarProducto(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Tipo de entrega */}
@@ -491,12 +599,7 @@ export default function FormularioPedido() {
               <input
                 type="radio"
                 checked={tipoEntrega === 'envio'}
-                onChange={() => {
-                  setTipoEntrega('envio');
-                  if (cliente?.address && !clienteEventual) {
-                    setDireccion(cliente.address);
-                  }
-                }}
+                onChange={() => setTipoEntrega('envio')}
                 className="mr-2"
               />
               Envío a domicilio
@@ -577,89 +680,32 @@ export default function FormularioPedido() {
           </select>
         </div>
 
-        {/* Chimichurri y Papas */}
-        <div className="space-y-3">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={conChimichurri}
-              onChange={(e) => setConChimichurri(e.target.checked)}
-              className="mr-2"
-              id="chimichurri"
-            />
-            <label htmlFor="chimichurri">Incluir chimichurri</label>
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={conPapas}
-              onChange={(e) => {
-                setConPapas(e.target.checked);
-                if (!e.target.checked) setCantidadPapas(0);
-              }}
-              className="mr-2"
-              id="papas"
-            />
-            <label htmlFor="papas" className="mr-2">Incluir porción de papas</label>
-            
-            {conPapas && (
-              <select
-                value={cantidadPapas}
-                onChange={(e) => setCantidadPapas(Number(e.target.value))}
-                className="p-1 border rounded"
-              >
-                <option value="0">0</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-              </select>
-            )}
-          </div>
+        {/* Chimichurri */}
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            checked={conChimichurri}
+            onChange={(e) => setConChimichurri(e.target.checked)}
+            className="mr-2"
+            id="chimichurri"
+          />
+          <label htmlFor="chimichurri">Incluir chimichurri</label>
         </div>
 
-        {/* Cantidad y precios */}
-        <div className="space-y-4">
-          <div>
-            <label className="block text-gray-700 mb-1">Cantidad de pollos*</label>
-            <input
-              type="number"
-              value={cantidadPollo}
-              onChange={handleCantidadPolloChange}
-              step="0.5"
-              min="0.5"
-              className="w-full p-2 border rounded"
-              required
-            />
-          </div>
-
-          <div className="bg-blue-50 p-3 rounded-lg">
-            <div className="flex justify-between font-bold">
-              <span>Total a pagar:</span>
-              <span className="text-lg text-blue-600">
-                ${formatNumber(precioFinal)}
-              </span>
-            </div>
-            {tipoEntrega === 'envio' && (
-              <div className="text-sm text-gray-600 mt-1">
-                {tipoEnvio === 'cercano' && `Incluye envío cercano: $${formatNumber(preciosConfig.envio_cercano)}`}
-                {tipoEnvio === 'lejano' && `Incluye costo de envío lejano: $${formatNumber(preciosConfig.envio_lejano)}`}
-                {tipoEnvio === 'la_banda' && `Incluye costo de envío a La Banda: $${formatNumber(preciosConfig.envio_la_banda)}`}
-                {tipoEnvio === 'gratis' && 'Incluye envío gratis'}
-              </div>
-            )}
-            {conPapas && cantidadPapas > 0 && (
-              <div className="text-sm text-gray-600 mt-1">
-                {cantidadPapas} porción(es) de papas: +${formatNumber(cantidadPapas * preciosConfig.papas_precio)}
-              </div>
-            )}
+        {/* Total */}
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="flex justify-between items-center">
+            <span className="text-lg font-bold">Total a pagar:</span>
+            <span className="text-2xl font-bold text-blue-600">
+              ${formatNumber(precioFinal)}
+            </span>
           </div>
         </div>
 
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-blue-300"
+          className="w-full bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 font-semibold"
         >
           {isLoading ? 'Procesando...' : 'Registrar Pedido'}
         </button>

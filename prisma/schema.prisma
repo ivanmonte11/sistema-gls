@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model clients {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(100)
+  phone      String?   @db.VarChar(20)
+  address    String?
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  updated_at DateTime? @default(now()) @db.Timestamp(6)
+  pedidos    pedidos[]
+}
+
+model pedidos {
+  id                      Int       @id @default(autoincrement())
+  numero_pedido           String    @unique @db.VarChar(20)
+  nombre_cliente          String    @db.VarChar(100)
+  telefono_cliente        String?   @db.VarChar(20)
+  tipo_entrega            String    @db.VarChar(10)
+  tipo_envio              String?   @db.VarChar(20)
+  direccion               String?
+  metodo_pago             String    @db.VarChar(20)
+  con_chimichurri         Boolean   @default(false)
+  precio_total            Decimal   @db.Decimal(10, 2)
+  fecha                   DateTime  @db.Date
+  hora_pedido             DateTime  @db.Time(6)
+  fecha_pedido            DateTime  @default(now()) @db.Timestamp(6)
+  hora_entrega_solicitada DateTime? @db.Time(6)
+  observaciones           String?
+  estado                  String?   @default("pendiente") @db.VarChar(20)
+  hora_entrega_real       DateTime? @db.Timestamp(6)
+  fecha_actualizacion     DateTime? @db.Timestamptz(6)
+  impreso                 Boolean?  @default(false)
+  client_id               Int?
+  cliente_eventual        Boolean?  @default(false)
+  clients                 clients?  @relation(fields: [client_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("pedidos")
+
+   pedido_items            pedido_items[]
+}
+
+model pedido_items {
+  id              Int      @id @default(autoincrement())
+  pedido_id       Int
+  producto_id     Int
+  cantidad        Decimal  @db.Decimal(10, 2)
+  precio_unitario Decimal  @db.Decimal(10, 2)
+  subtotal        Decimal  @db.Decimal(10, 2)
+  observaciones   String?
+  created_at      DateTime @default(now())
+
+  pedido   pedidos @relation(fields: [pedido_id], references: [id], onDelete: Cascade)
+  producto stock   @relation(fields: [producto_id], references: [id], onDelete: Cascade)
+
+  @@map("pedido_items")
+}
+
+// AGREGAR ESTOS ENUMS PARA MEJOR VALIDACIÓN:
+enum tipo_entrega {
+  retira
+  envio
+}
+
+enum tipo_envio {
+  cercano
+  lejano
+  la_banda
+  gratis
+}
+
+enum metodo_pago {
+  efectivo
+  debito
+  credito
+  transferencia
+}
+
+enum EstadoPedido {
+  pendiente
+  preparando
+  en_camino
+  entregado
+  cancelado
+}
+
+model precio_config {
+  id          Int       @id @default(autoincrement())
+  item_key    String    @unique @db.VarChar(50)
+  item_name   String    @db.VarChar(100)
+  item_value  Decimal   @db.Decimal(10, 2)
+  description String?
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@map("precio_config")
+}
+
+model reset_logs {
+  fecha DateTime @id @default(now()) @db.Timestamptz(6)
+
+  @@map("reset_logs")
+}
+
+model stock {
+  id                 Int         @id @default(autoincrement())
+  producto           String      @db.VarChar(100)
+  cantidad           Decimal     @db.Decimal(10, 2)
+  precio             Decimal?    @db.Decimal(10, 2)
+  tipo_medida        TipoMedida  @default(unidad)
+  categoria          String?     @db.VarChar(50)
+  activo             Boolean     @default(true)
+  fecha_actualizacion DateTime    @default(now())
+
+   pedido_items       pedido_items[]
+
+  @@map("stock")
+}
+
+enum TipoMedida {
+  unidad
+  kilo
+  gramo
+  litro
+  docena
+  porcion
+}

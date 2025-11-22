@@ -1,61 +1,226 @@
 'use client';
 import { useEffect, useState } from 'react';
 
-interface TablaStockProps {
-  stock: number;
-  precio?: number; // Aún puede pasarse manualmente
+interface ProductoStock {
+  id: number;
+  producto: string;
+  cantidad: number;
+  precio: number | null;
+  tipo_medida: string;
+  categoria: string | null;
+  activo: boolean;
 }
 
-export default function TablaStock({ stock, precio }: TablaStockProps) {
-  const [precioFinal, setPrecioFinal] = useState<number | undefined>(precio);
+interface TablaStockProps {
+  productos: ProductoStock[];
+  onActualizarProducto?: (id: number, datos: Partial<ProductoStock>) => void;
+  onDesactivarProducto?: (id: number) => void;
+  modoEdicion?: boolean;
+}
+
+export default function TablaStock({
+  productos,
+  onActualizarProducto,
+  onDesactivarProducto,
+  modoEdicion = false
+}: TablaStockProps) {
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [formData, setFormData] = useState<Partial<ProductoStock>>({});
+  const [productosLocales, setProductosLocales] = useState<ProductoStock[]>(productos);
 
   useEffect(() => {
-    // Solo buscar si no vino desde props
-    if (precio === undefined) {
-      fetch('/api/precios')
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            const pollo = data.data.find((item: any) => item.item_key === 'pollo_precio');
-            if (pollo) {
-              setPrecioFinal(pollo.item_value);
-            }
-          }
-        })
-        .catch(err => {
-          console.error('Error fetching pollo_precio:', err);
-        });
+    setProductosLocales(productos);
+  }, [productos]);
+
+  const tiposMedida = ['unidad', 'kilo', 'gramo', 'litro', 'docena', 'porcion'];
+  const categorias = ['Pollos', 'Papas', 'Bebidas', 'Acompañamientos', 'Postres', 'Otros'];
+
+  const iniciarEdicion = (producto: ProductoStock) => {
+    setEditandoId(producto.id);
+    setFormData({ ...producto });
+  };
+
+  const guardarEdicion = async () => {
+    if (editandoId && formData && onActualizarProducto) {
+      await onActualizarProducto(editandoId, formData);
+      setEditandoId(null);
+      setFormData({});
     }
-  }, [precio]);
+  };
+
+  const cancelarEdicion = () => {
+    setEditandoId(null);
+    setFormData({});
+  };
+
+  const handleDesactivarProducto = async (id: number) => {
+    if (onDesactivarProducto) {
+      await onDesactivarProducto(id);
+    }
+  };
 
   const formatNumber = (num: number) => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
 
+  const getLabelTipoMedida = (tipo: string) => {
+    const labels: { [key: string]: string } = {
+      unidad: 'unidades',
+      kilo: 'kg',
+      gramo: 'g',
+      litro: 'L',
+      docena: 'docenas',
+      porcion: 'porciones'
+    };
+    return labels[tipo] || tipo;
+  };
+
+  const getCantidadDisplay = (producto: ProductoStock) => {
+    if (producto.tipo_medida === 'kilo' && producto.cantidad < 1) {
+      return `${(producto.cantidad * 1000).toFixed(0)}g`;
+    }
+    return `${formatNumber(producto.cantidad)} ${getLabelTipoMedida(producto.tipo_medida)}`;
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">Stock Disponible</h2>
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+        {modoEdicion ? 'Gestión de Productos' : 'Stock Disponible'}
+      </h2>
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b bg-gray-50">
               <th className="p-3 font-medium text-gray-700">Producto</th>
+              <th className="p-3 font-medium text-gray-700">Categoría</th>
               <th className="p-3 font-medium text-gray-700">Cantidad</th>
               <th className="p-3 font-medium text-gray-700">Precio Unitario</th>
+              {modoEdicion && (
+                <th className="p-3 font-medium text-gray-700">Acciones</th>
+              )}
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b hover:bg-gray-50 transition-colors">
-              <td className="p-3 text-gray-600">Pollo</td>
-              <td className="p-3 text-gray-800 font-medium">{formatNumber(stock)}</td>
-              <td className="p-3 text-gray-800 font-medium">
-                {typeof precioFinal === 'number' ? (
-                  <span className="text-green-600">${formatNumber(precioFinal)}</span>
+            {productosLocales.filter(p => p.activo).map((producto) => (
+              <tr key={producto.id} className="border-b hover:bg-gray-50 transition-colors">
+                {editandoId === producto.id && modoEdicion ? (
+                  // Modo edición
+                  <>
+                    <td className="p-3">
+                      <input
+                        type="text"
+                        value={formData.producto || ''}
+                        onChange={(e) => setFormData({...formData, producto: e.target.value})}
+                        className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Nombre del producto"
+                      />
+                    </td>
+                    <td className="p-3">
+                      <select
+                        value={formData.categoria || ''}
+                        onChange={(e) => setFormData({...formData, categoria: e.target.value})}
+                        className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">Sin categoría</option>
+                        {categorias.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formData.cantidad || 0}
+                          onChange={(e) => setFormData({...formData, cantidad: parseFloat(e.target.value)})}
+                          className="w-24 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <select
+                          value={formData.tipo_medida || 'unidad'}
+                          onChange={(e) => setFormData({...formData, tipo_medida: e.target.value})}
+                          className="w-32 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          {tiposMedida.map(tipo => (
+                            <option key={tipo} value={tipo}>{tipo}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.precio || ''}
+                        onChange={(e) => setFormData({...formData, precio: e.target.value ? parseFloat(e.target.value) : null})}
+                        className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Precio opcional"
+                      />
+                    </td>
+                    <td className="p-3">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={guardarEdicion}
+                          className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                        >
+                          <span className="mr-1">✓</span> Guardar
+                        </button>
+                        <button
+                          onClick={cancelarEdicion}
+                          className="bg-gray-500 text-white px-3 py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center"
+                        >
+                          <span className="mr-1">✗</span> Cancelar
+                        </button>
+                      </div>
+                    </td>
+                  </>
                 ) : (
-                  <span className="text-gray-400">Cargando...</span>
+                  // Modo visualización
+                  <>
+                    <td className="p-3 text-gray-800 font-medium">{producto.producto}</td>
+                    <td className="p-3 text-gray-600">
+                      {producto.categoria || <span className="text-gray-400">-</span>}
+                    </td>
+                    <td className="p-3 text-gray-800 font-medium">
+                      {getCantidadDisplay(producto)}
+                    </td>
+                    <td className="p-3 text-gray-800 font-medium">
+                      {producto.precio ? (
+                        <span className="text-green-600">${formatNumber(producto.precio)}</span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    {modoEdicion && (
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => iniciarEdicion(producto)}
+                            className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDesactivarProducto(producto.id)}
+                            className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                          >
+                            Desactivar
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </>
                 )}
-              </td>
-            </tr>
+              </tr>
+            ))}
+
+            {productosLocales.filter(p => p.activo).length === 0 && (
+              <tr>
+                <td colSpan={modoEdicion ? 5 : 4} className="p-4 text-center text-gray-500">
+                  No hay productos activos en stock
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

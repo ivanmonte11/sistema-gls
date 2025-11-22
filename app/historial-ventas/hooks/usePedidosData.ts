@@ -17,45 +17,73 @@ export const usePedidosData = (fechaSeleccionada: Date) => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        setError(null);
         const fechaFormateada = format(fechaSeleccionada, 'yyyy-MM-dd');
+
+        console.log('🔄 Fetching pedidos for date:', fechaFormateada);
 
         const [pedidosResponse, estadisticasResponse] = await Promise.all([
           fetch(`/api/pedidos?fecha=${fechaFormateada}`),
           fetch(`/api/pedidos/estadisticas?fecha=${fechaFormateada}`)
         ]);
 
-        if (!pedidosResponse.ok || !estadisticasResponse.ok) {
-          throw new Error('Error al cargar datos');
+        console.log('📡 Pedidos response status:', pedidosResponse.status);
+        console.log('📡 Estadísticas response status:', estadisticasResponse.status);
+
+        if (!pedidosResponse.ok) {
+          throw new Error(`Error ${pedidosResponse.status} al cargar pedidos`);
+        }
+
+        if (!estadisticasResponse.ok) {
+          console.warn('⚠️ No se pudieron cargar las estadísticas, continuando sin ellas...');
         }
 
         const pedidosData = await pedidosResponse.json();
-        const estadisticasData = await estadisticasResponse.json();
+        console.log('📦 Datos de pedidos recibidos:', pedidosData);
 
-        if (!pedidosData.success || !estadisticasData.success) {
-          throw new Error(pedidosData.error || estadisticasData.error || 'Error en los datos');
+        if (!pedidosData.success) {
+          throw new Error(pedidosData.error || 'Error en los datos de pedidos');
         }
 
-        const pedidosFormateados = pedidosData.data.map((pedido: Pedido) => ({
-          ...pedido,
-          precio_total: typeof pedido.precio_total === 'string'
-            ? parseFloat(pedido.precio_total)
-            : pedido.precio_total,
-          precio_unitario: typeof pedido.precio_unitario === 'string'
-            ? parseFloat(pedido.precio_unitario)
-            : pedido.precio_unitario,
-          cantidad_pollo: typeof pedido.cantidad_pollo === 'string'
-            ? parseFloat(pedido.cantidad_pollo)
-            : pedido.cantidad_pollo,
-          estado: pedido.estado || 'pendiente'
-        }));
+        // Procesar pedidos con la NUEVA estructura
+        const pedidosFormateados = (pedidosData.data || []).map((pedido: any) => {
+          console.log('🔍 Procesando pedido:', pedido.id, pedido.numero_pedido);
+          console.log('🛍️ Items del pedido:', pedido.items);
 
-        setPedidos(pedidosFormateados || []);
+          return {
+            ...pedido,
+            // Asegurar que precio_total sea número
+            precio_total: typeof pedido.precio_total === 'string'
+              ? parseFloat(pedido.precio_total)
+              : pedido.precio_total || 0,
+            // Estado por defecto
+            estado: pedido.estado || 'pendiente',
+            // Asegurar que items sea un array
+            items: pedido.items || []
+          };
+        });
+
+        console.log('✅ Pedidos formateados:', pedidosFormateados.length);
+
+        setPedidos(pedidosFormateados);
         setPedidosEntregados(pedidosFormateados.filter((p: Pedido) => p.estado === 'entregado'));
-        setEstadisticas(estadisticasData.data.estadisticas);
+
+        // Procesar estadísticas si están disponibles
+        if (estadisticasResponse.ok) {
+          const estadisticasData = await estadisticasResponse.json();
+          if (estadisticasData.success) {
+            setEstadisticas(estadisticasData.data.estadisticas);
+          }
+        }
 
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error desconocido');
-        console.error('Error fetching data:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+        console.error('❌ Error fetching data:', err);
+        setError(errorMessage);
+
+        // Resetear datos en caso de error
+        setPedidos([]);
+        setPedidosEntregados([]);
       } finally {
         setIsLoading(false);
       }

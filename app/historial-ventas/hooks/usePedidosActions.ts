@@ -75,97 +75,92 @@ export const usePedidosActions = (
     }
   };
 
-  const handleEditarPedido = async (pedidoEditado: Pedido) => {
-    // 1. Guardar copia de seguridad ANTES del try
-    const currentPedidos = [...pedidos];
-    const currentEntregados = [...pedidosEntregados];
+  // En usePedidosActions.ts - ACTUALIZAR handleEditarPedido
+const handleEditarPedido = async (pedidoEditado: Pedido) => {
+  const currentPedidos = [...pedidos];
+  const currentEntregados = [...pedidosEntregados];
 
-    try {
-      setIsEditing(true);
-      setError(null);
+  try {
+    setIsEditing(true);
+    setError(null);
 
-      // 2. Actualización optimista
-      const nuevosPedidos = pedidos.map(pedido =>
-        pedido.id === pedidoEditado.id ? { ...pedido, ...pedidoEditado } : pedido
-      );
+    // Actualización optimista
+    const nuevosPedidos = pedidos.map(pedido =>
+      pedido.id === pedidoEditado.id ? { ...pedido, ...pedidoEditado } : pedido
+    );
 
-      let nuevosEntregados = [...pedidosEntregados];
-      if (pedidoEditado.estado === 'entregado') {
-        const pedidoActualizado = nuevosPedidos.find(p => p.id === pedidoEditado.id);
-        if (pedidoActualizado) {
-          nuevosEntregados = [
-            pedidoActualizado,
-            ...pedidosEntregados.filter(p => p.id !== pedidoEditado.id)
-          ];
-        }
-      } else {
-        nuevosEntregados = pedidosEntregados.filter(p => p.id !== pedidoEditado.id);
+    let nuevosEntregados = [...pedidosEntregados];
+    if (pedidoEditado.estado === 'entregado') {
+      const pedidoActualizado = nuevosPedidos.find(p => p.id === pedidoEditado.id);
+      if (pedidoActualizado) {
+        nuevosEntregados = [pedidoActualizado, ...pedidosEntregados.filter(p => p.id !== pedidoEditado.id)];
       }
-
-      // 3. Aplicar cambios optimistas
-      updateData(nuevosPedidos, nuevosEntregados);
-
-      // 4. Llamada API
-      const response = await fetch('/api/pedidos', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: pedidoEditado.id,
-          nombre: pedidoEditado.nombre_cliente,
-          telefono: pedidoEditado.telefono_cliente,
-          tipoEntrega: pedidoEditado.tipo_entrega,
-          tipoEnvio: pedidoEditado.tipo_envio,
-          direccion: pedidoEditado.direccion,
-          metodoPago: pedidoEditado.metodo_pago,
-          conChimichurri: pedidoEditado.con_chimichurri,
-          conPapas: pedidoEditado.con_papas,
-          cantidadPapas: pedidoEditado.cantidad_papas,
-          cantidadPollo: pedidoEditado.cantidad_pollo,
-          precioUnitario: pedidoEditado.precio_unitario,
-          horaEntrega: pedidoEditado.hora_entrega_solicitada
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Error al editar pedido');
-      }
-
-      // 5. Actualizar con datos confirmados (con fallback)
-      const pedidoConfirmado = {
-        ...pedidoEditado,
-        ...(data.data || {}),
-        id: pedidoEditado.id // Nunca cambiar el ID
-      };
-
-      const pedidosActualizados = nuevosPedidos.map(pedido =>
-        pedido.id === pedidoEditado.id ? pedidoConfirmado : pedido
-      );
-
-      let entregadosActualizados = [...nuevosEntregados];
-      if (pedidoConfirmado.estado === 'entregado') {
-        entregadosActualizados = [
-          ...pedidosActualizados.filter(p => p.id === pedidoEditado.id && p.estado === 'entregado'),
-          ...nuevosEntregados.filter(p => p.id !== pedidoEditado.id)
-        ];
-      } else {
-        entregadosActualizados = nuevosEntregados.filter(p => p.id !== pedidoEditado.id);
-      }
-
-      updateData(pedidosActualizados, entregadosActualizados);
-
-      return { success: true, message: 'Pedido actualizado correctamente' };
-    } catch (error) {
-      console.error('Error al editar pedido:', error);
-      setError(error instanceof Error ? error.message : 'Error al editar pedido');
-      // 6. Revertir en caso de error
-      updateData(currentPedidos, currentEntregados);
-      return { success: false, error: error instanceof Error ? error.message : 'Error al editar pedido' };
-    } finally {
-      setIsEditing(false);
+    } else {
+      nuevosEntregados = pedidosEntregados.filter(p => p.id !== pedidoEditado.id);
     }
-  };
+
+    updateData(nuevosPedidos, nuevosEntregados);
+
+    // Preparar datos para el backend CON LA ESTRUCTURA CORRECTA
+    const datosParaBackend = {
+      id: pedidoEditado.id,
+      // Campos básicos
+      nombre: pedidoEditado.nombre_cliente,
+      telefono: pedidoEditado.telefono_cliente || '',
+      tipoEntrega: pedidoEditado.tipo_entrega,
+      metodoPago: pedidoEditado.metodo_pago,
+      horaEntrega: pedidoEditado.hora_entrega_solicitada,
+      // Campos condicionales
+      tipoEnvio: pedidoEditado.tipo_entrega === 'envio' ? pedidoEditado.tipo_envio : null,
+      direccion: pedidoEditado.tipo_entrega === 'envio' ? pedidoEditado.direccion : null,
+      // Items del pedido (desde pedido_items)
+      items: pedidoEditado.items?.map(item => ({
+        producto_id: item.producto_id,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+        subtotal: item.subtotal,
+        observaciones: item.observaciones || ''
+      })) || [],
+      precioTotal: pedidoEditado.precio_total,
+      conChimichurri: pedidoEditado.con_chimichurri,
+      clienteEventual: pedidoEditado.cliente_eventual || false,
+      cliente_id: pedidoEditado.cliente_id || null
+    };
+
+    console.log('📤 Enviando edición:', datosParaBackend);
+
+    // Llamada API
+    const response = await fetch('/api/pedidos', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datosParaBackend),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Error al editar pedido');
+    }
+
+    // Actualizar con respuesta del servidor
+    const pedidoConfirmado = data.data || pedidoEditado;
+
+    const pedidosActualizados = nuevosPedidos.map(pedido =>
+      pedido.id === pedidoEditado.id ? { ...pedido, ...pedidoConfirmado } : pedido
+    );
+
+    updateData(pedidosActualizados, nuevosEntregados);
+
+    return { success: true, message: 'Pedido actualizado correctamente' };
+  } catch (error) {
+    console.error('Error al editar pedido:', error);
+    setError(error instanceof Error ? error.message : 'Error al editar pedido');
+    updateData(currentPedidos, currentEntregados);
+    return { success: false, error: error instanceof Error ? error.message : 'Error al editar pedido' };
+  } finally {
+    setIsEditing(false);
+  }
+};
 
   return {
     isEditing,

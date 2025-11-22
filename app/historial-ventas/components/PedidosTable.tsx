@@ -7,8 +7,10 @@ import {
   formatTipoEnvio,
   formatNumeroPedido,
   formatPrecio,
-  formatCantidadPollo,
-  formatHora
+  formatHora,
+  obtenerResumenProductos,
+  formatearCantidadConMedida,
+  obtenerIconoProducto
 } from '../utils/formatters';
 import { TicketPedido } from './TicketPedido';
 
@@ -116,80 +118,116 @@ export const PedidosTable = ({
               <th className="px-4 py-2">Entrega</th>
               <th className="px-4 py-2">Pago</th>
               <th className="px-4 py-2">Chimi</th>
-              <th className="px-4 py-2">Papas</th>
-              <th className="px-4 py-2">Cant. Pollo</th>
+              <th className="px-4 py-2">Productos</th>
+              <th className="px-4 py-2">Cantidad</th>
               <th className="px-4 py-2">Total</th>
               <th className="px-4 py-2">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filteredPedidos.length > 0 ? (
-              filteredPedidos.map((pedido) => (
-                <tr key={pedido.id} className={`border-b hover:bg-gray-50 ${pedido.estado === 'entregado' ? 'bg-green-50' : ''}`}>
-                  <td className="px-4 py-3">{formatNumeroPedido(pedido.numero_pedido)}</td>
-                  <td className="text-lg font-bold text-gray-800 tracking-wide">{pedido.nombre_cliente}</td>
-                  <td className="px-4 py-3">{pedido.telefono_cliente || '-'}</td>
-                  <td className="px-4 py-3">{formatHora(pedido.hora_pedido)}</td>
-                  <td className="px-4 py-3 bg-yellow-100">{formatHora(pedido.hora_entrega_solicitada)}</td>
-                  <td className="px-4 py-3">
-                    {pedido.tipo_entrega === 'envio'
-                      ? `Envío (${formatTipoEnvio(pedido.tipo_envio)})`
-                      : 'Retira'}
-                  </td>
-                  <td className="px-4 py-3">{formatMetodoPago(pedido.metodo_pago)}</td>
-                  <td className="px-4 py-3 text-center">{pedido.con_chimichurri ? '✅' : '❌'}</td>
-                  <td className="px-4 py-3 text-center">{pedido.con_papas ? `${pedido.cantidad_papas} 🍟` : '❌'}</td>
-                  <td className="px-4 py-3">{formatCantidadPollo(pedido.cantidad_pollo)}</td>
-                  <td className="px-4 py-3 font-semibold">{formatPrecio(pedido.precio_total)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col space-y-2">
-                      <TicketPedido pedido={pedido}
-                        onPedidoImpreso={onPedidoImpreso}
-                      />
+              filteredPedidos.map((pedido) => {
+                const { productos } = obtenerResumenProductos(pedido.items || []);
 
-                      <button
-                        onClick={() => setPedidoAEditar(pedido)}
-                        className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded transition-colors"
-                      >
-                        Editar
-                      </button>
+                return (
+                  <tr key={pedido.id} className={`border-b hover:bg-gray-50 ${pedido.estado === 'entregado' ? 'bg-green-50' : ''}`}>
+                    <td className="px-4 py-3">{formatNumeroPedido(pedido.numero_pedido)}</td>
+                    <td className="text-lg font-bold text-gray-800 tracking-wide">{pedido.nombre_cliente}</td>
+                    <td className="px-4 py-3">{pedido.telefono_cliente || '-'}</td>
+                    <td className="px-4 py-3">{formatHora(pedido.hora_pedido)}</td>
+                    <td className="px-4 py-3 bg-yellow-100">{formatHora(pedido.hora_entrega_solicitada)}</td>
+                    <td className="px-4 py-3">
+                      {pedido.tipo_entrega === 'envio'
+                        ? `Envío (${formatTipoEnvio(pedido.tipo_envio)})`
+                        : 'Retira'}
+                    </td>
+                    <td className="px-4 py-3">{formatMetodoPago(pedido.metodo_pago)}</td>
+                    <td className="px-4 py-3 text-center">{pedido.con_chimichurri ? '✅' : '❌'}</td>
 
-                      {!pedido.impreso && (
-                        <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">
-                          🖨️ No impreso
-                        </span>
-                      )}
+                    {/* Columna Productos */}
+                    <td className="px-4 py-3">
+                      <div className="text-sm space-y-1">
+                        {productos.map((producto, index) => (
+                          <div key={producto.id} className="flex items-center">
+                            <span className="mr-1">
+                              {obtenerIconoProducto(producto.nombre, producto.tipo_medida, producto.producto_id)}
+                            </span>
+                            <span>{producto.nombre}</span>
+                          </div>
+                        ))}
+                        {productos.length === 0 && (
+                          <span className="text-gray-400">Sin productos</span>
+                        )}
+                      </div>
+                    </td>
 
+                    {/* Columna Cantidad */}
+                    <td className="px-4 py-3">
+                      <div className="text-sm space-y-1">
+                        {productos.map((producto, index) => (
+                          <div key={producto.id} className="text-center">
+                            <span className="font-medium text-blue-600">
+                              {formatearCantidadConMedida(producto.cantidad, producto.tipo_medida, producto.nombre)}
+                            </span>
+                          </div>
+                        ))}
+                        {productos.length === 0 && (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </div>
+                    </td>
 
-                      <span className={`px-2 py-1 rounded-full text-xs ${pedido.estado === 'entregado'
+                    <td className="px-4 py-3 font-semibold">{formatPrecio(pedido.precio_total)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col space-y-2">
+                        <TicketPedido
+                          pedido={pedido}
+                          onPedidoImpreso={onPedidoImpreso}
+                        />
+
+                        <button
+                          onClick={() => setPedidoAEditar(pedido)}
+                          className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded transition-colors"
+                        >
+                          Editar
+                        </button>
+
+                        {!pedido.impreso && (
+                          <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full text-center">
+                            🖨️ No impreso
+                          </span>
+                        )}
+
+                        <span className={`px-2 py-1 rounded-full text-xs text-center ${pedido.estado === 'entregado'
                           ? 'bg-green-100 text-green-800'
                           : pedido.estado === 'cancelado'
                             ? 'bg-red-100 text-red-800'
                             : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                        {pedido.estado}
-                      </span>
+                          }`}>
+                          {pedido.estado}
+                        </span>
 
-                      {pedido.estado !== 'entregado' && pedido.estado !== 'cancelado' && (
-                        <>
-                          <button
-                            onClick={() => actualizarEstadoPedido(pedido.id, 'entregado')}
-                            className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded transition-colors"
-                          >
-                            Marcar como entregado
-                          </button>
-                          <button
-                            onClick={() => actualizarEstadoPedido(pedido.id, 'cancelado')}
-                            className="bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded transition-colors"
-                          >
-                            Cancelar pedido
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        {pedido.estado !== 'entregado' && pedido.estado !== 'cancelado' && (
+                          <>
+                            <button
+                              onClick={() => actualizarEstadoPedido(pedido.id, 'entregado')}
+                              className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded transition-colors"
+                            >
+                              Marcar como entregado
+                            </button>
+                            <button
+                              onClick={() => actualizarEstadoPedido(pedido.id, 'cancelado')}
+                              className="bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded transition-colors"
+                            >
+                              Cancelar pedido
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan={12} className="px-4 py-6 text-center text-gray-500">
@@ -199,7 +237,6 @@ export const PedidosTable = ({
             )}
           </tbody>
         </table>
-
       </div>
     </>
   );

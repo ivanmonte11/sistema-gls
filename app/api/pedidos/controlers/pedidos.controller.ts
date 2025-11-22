@@ -5,7 +5,7 @@ import {
   actualizarEstadoPedido,
   obtenerPedidos,
   obtenerPedidosPorCliente,
-  marcarPedidoComoImpreso, 
+  marcarPedidoComoImpreso,
 } from '../services/pedidos.service';
 import pool from '@/lib/db';
 import { validarPedido, validarActualizacionEstado } from '../utils/validators.utils';
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
 
@@ -60,21 +60,26 @@ export async function POST(request: Request) {
     const data = await request.json();
     console.log('→ Datos recibidos del pedido:', data);
 
-    // Validación del pedido
+    // Validación del pedido - ACTUALIZADA para múltiples productos
     const { isValid, errors } = validarPedido(data);
     if (!isValid) {
       throw new Error(`Datos inválidos: ${JSON.stringify(errors)}`);
     }
 
-    // Procesamiento del cliente - MODIFICADO PARA CLIENTES EVENTUALES
+    // Verificar que haya items en el pedido
+    if (!data.items || data.items.length === 0) {
+      throw new Error('El pedido debe contener al menos un producto');
+    }
+
+    // Procesamiento del cliente - MANTENIDO
     let clientId: number | null = null;
 
     if (!data.clienteEventual && data.nombre) {
       // Buscar por teléfono si existe, sino por nombre
-      const searchQuery = data.telefono 
+      const searchQuery = data.telefono
         ? 'SELECT id FROM clients WHERE phone = $1 LIMIT 1'
         : 'SELECT id FROM clients WHERE name = $1 LIMIT 1';
-      
+
       const searchValue = data.telefono || data.nombre;
 
       const clientResult = await client.query(searchQuery, [searchValue]);
@@ -93,11 +98,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // Crear el pedido
+    // Crear el pedido - ACTUALIZADO para múltiples productos
     const resultado = await crearPedido(client, {
       ...data,
       client_id: clientId,
-      clienteEventual: data.clienteEventual || false
+      clienteEventual: data.clienteEventual || false,
+      items: data.items // Incluir los items del pedido
     });
 
     await client.query('COMMIT');
@@ -128,6 +134,7 @@ export async function POST(request: Request) {
   }
 }
 
+// Los métodos PATCH, PUT se mantienen igual...
 export async function PATCH(request: Request) {
   try {
     if (!request.headers.get('content-type')?.includes('application/json')) {
@@ -138,6 +145,7 @@ export async function PATCH(request: Request) {
     }
 
     const data = await request.json();
+    console.log('📨 PATCH request data:', data);
 
     // ✅ Manejar pedidos impresos directamente
     if (data.impreso === true && typeof data.id === 'number') {
@@ -159,12 +167,14 @@ export async function PATCH(request: Request) {
     // ✅ Validar y actualizar estado de pedido
     const { isValid, errors } = validarActualizacionEstado(data);
     if (!isValid) {
+      console.error('❌ Validación fallida:', errors);
       return NextResponse.json(
         { success: false, error: 'Datos inválidos', details: errors },
         { status: 400 }
       );
     }
 
+    console.log('🔄 Ejecutando actualizarEstadoPedido con:', data);
     const resultado = await actualizarEstadoPedido(data);
 
     return NextResponse.json({
@@ -175,7 +185,7 @@ export async function PATCH(request: Request) {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    console.error('Error en PATCH /api/pedidos:', errorMessage);
+    console.error('❌ Error en PATCH /api/pedidos:', errorMessage);
 
     return NextResponse.json(
       {
@@ -188,9 +198,10 @@ export async function PATCH(request: Request) {
   }
 }
 
-
 export async function PUT(request: Request) {
   try {
+    console.log('→ Iniciando PUT /api/pedidos (EDICIÓN)');
+
     if (!request.headers.get('content-type')?.includes('application/json')) {
       return NextResponse.json(
         { success: false, error: 'Content-Type debe ser application/json' },
@@ -199,15 +210,9 @@ export async function PUT(request: Request) {
     }
 
     const data = await request.json();
-    const { isValid, errors } = validarPedido(data);
-    
-    if (!isValid) {
-      return NextResponse.json(
-        { success: false, error: 'Datos inválidos', details: errors },
-        { status: 400 }
-      );
-    }
+    console.log('→ Datos recibidos para edición:', JSON.stringify(data, null, 2));
 
+    // Validación básica
     if (!data.id) {
       return NextResponse.json(
         { success: false, error: 'Se requiere el ID del pedido' },
@@ -215,20 +220,50 @@ export async function PUT(request: Request) {
       );
     }
 
+    if (!data.nombre || !data.tipoEntrega || !data.metodoPago || !data.horaEntrega) {
+      return NextResponse.json(
+        { success: false, error: 'Faltan campos requeridos: nombre, tipoEntrega, metodoPago, horaEntrega' },
+        { status: 400 }
+      );
+    }
+
+    if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'El pedido debe contener al menos un producto' },
+        { status: 400 }
+      );
+    }
+
+    // Verificar que el pedido existe
+    const pedidoExistente = await pool.query(
+      'SELECT id, estado FROM pedidos WHERE id = $1',
+      [data.id]
+    );
+
+    if (pedidoExistente.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Pedido no encontrado' },
+        { status: 404 }
+      );
+    }
+
+    // Actualizar el pedido
     const resultado = await actualizarPedido(data);
-    
+
+    console.log('✅ Pedido actualizado exitosamente');
+
     return NextResponse.json({
       success: true,
       message: 'Pedido actualizado con éxito',
-      ...resultado
+      data: resultado
     });
-    
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    console.error('Error en PUT /api/pedidos:', errorMessage);
+    console.error('❌ Error en PUT /api/pedidos:', errorMessage);
 
     return NextResponse.json(
-      { 
+      {
         success: false,
         error: 'Error al actualizar el pedido',
         details: process.env.NODE_ENV === 'development' ? errorMessage : null
