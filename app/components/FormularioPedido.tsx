@@ -31,6 +31,7 @@ interface PreciosConfig {
   envio_cercano: number;
   envio_lejano: number;
   envio_la_banda: number;
+  medio_pollo: number;
 }
 
 const formatNumber = (num: number) => {
@@ -66,7 +67,8 @@ export default function FormularioPedido() {
   const [preciosConfig, setPreciosConfig] = useState<PreciosConfig>({
     envio_cercano: 1500,
     envio_lejano: 2500,
-    envio_la_banda: 3000
+    envio_la_banda: 3000,
+    medio_pollo: 1000
   });
 
   // Cargar productos y configuraciones
@@ -83,13 +85,9 @@ export default function FormularioPedido() {
   }, []);
 
   // Calcular precio total cuando cambian los items o el envío
- // Calcular precio total cuando cambian los items o el envío
-useEffect(() => {
-  console.log('🔄 useEffect - Recalculando precio...');
-  console.log('📋 Items en estado:', itemsPedido);
-  console.log('🚚 Tipo entrega:', tipoEntrega);
-  calcularPrecioTotal();
-}, [itemsPedido, tipoEntrega, tipoEnvio]);
+  useEffect(() => {
+    calcularPrecioTotal();
+  }, [itemsPedido, tipoEntrega, tipoEnvio, preciosConfig]);
 
   // Cargar clientes al buscar
   useEffect(() => {
@@ -99,7 +97,7 @@ useEffect(() => {
         try {
           const res = await fetch(`/api/clients?search=${encodeURIComponent(busquedaCliente)}&autocomplete=true`);
           if (res.ok) {
-            const clientes = await res.json(); // Array directo
+            const clientes = await res.json();
             setClientesSugeridos(clientes);
           }
         } catch (error) {
@@ -151,7 +149,8 @@ useEffect(() => {
           }, {});
           setPreciosConfig(prev => ({
             ...prev,
-            ...preciosMap
+            ...preciosMap,
+            medio_pollo: preciosMap.medio_pollo || 1000
           }));
         }
       }
@@ -160,39 +159,45 @@ useEffect(() => {
     }
   };
 
-  const agregarProducto = () => {
-  if (!productoSeleccionado || cantidadProducto <= 0) return;
+  // Función para obtener el stock disponible de un producto
+  const getStockDisponible = (productoId: number): number => {
+    const producto = productos.find(p => p.id === productoId);
+    if (!producto) return 0;
 
-  console.log('🔄 Agregando producto...');
-  console.log('🎯 Producto seleccionado ID:', productoSeleccionado);
-  console.log('🎯 Cantidad:', cantidadProducto);
+    // Calcular cuánto stock ya está reservado en el pedido actual
+    const stockReservado = itemsPedido
+      .filter(item => item.producto_id === productoId)
+      .reduce((total, item) => total + item.cantidad, 0);
 
-  const producto = productos.find(p => p.id === parseInt(productoSeleccionado));
-  console.log('🔍 Producto encontrado:', producto);
-
-  if (!producto || !producto.precio) return;
-
-  // Verificar stock
-  if (cantidadProducto > producto.cantidad) {
-    alert(`Stock insuficiente. Disponible: ${producto.cantidad} ${getLabelTipoMedida(producto.tipo_medida)}`);
-    return;
-  }
-
-  const nuevoItem: ItemPedido = {
-    producto_id: producto.id,
-    producto_nombre: producto.producto,
-    cantidad: cantidadProducto,
-    precio_unitario: producto.precio,
-    subtotal: producto.precio * cantidadProducto,
-    tipo_medida: producto.tipo_medida
+    return producto.cantidad - stockReservado;
   };
 
-  console.log('➕ Nuevo item:', nuevoItem);
+  const agregarProducto = () => {
+    if (!productoSeleccionado || cantidadProducto <= 0) return;
 
-  setItemsPedido([...itemsPedido, nuevoItem]);
-  setProductoSeleccionado('');
-  setCantidadProducto(1);
-};
+    const producto = productos.find(p => p.id === parseInt(productoSeleccionado));
+    if (!producto || !producto.precio) return;
+
+    // Verificar stock disponible
+    const stockDisponible = getStockDisponible(producto.id);
+    if (cantidadProducto > stockDisponible) {
+      alert(`Stock insuficiente. Disponible: ${stockDisponible} ${getLabelTipoMedida(producto.tipo_medida)}`);
+      return;
+    }
+
+    const nuevoItem: ItemPedido = {
+      producto_id: producto.id,
+      producto_nombre: producto.producto,
+      cantidad: cantidadProducto,
+      precio_unitario: producto.precio,
+      subtotal: producto.precio * cantidadProducto,
+      tipo_medida: producto.tipo_medida
+    };
+
+    setItemsPedido([...itemsPedido, nuevoItem]);
+    setProductoSeleccionado('');
+    setCantidadProducto(1);
+  };
 
   const eliminarProducto = (index: number) => {
     const nuevosItems = [...itemsPedido];
@@ -200,44 +205,32 @@ useEffect(() => {
     setItemsPedido(nuevosItems);
   };
 
- const calcularPrecioTotal = () => {
-  // Calcular subtotal de todos los productos
-  console.log('🔍 ITEMS_PEDIDO:', itemsPedido); // ← VER QUÉ HAY EN itemsPedido
+  const calcularPrecioTotal = () => {
+    // Calcular subtotal de todos los productos
+    let subtotal = itemsPedido.reduce((total, item) => total + item.subtotal, 0);
 
-  let subtotal = itemsPedido.reduce((total, item) => {
-    console.log('📊 Item:', item.producto_nombre, 'Cantidad:', item.cantidad, 'Precio:', item.precio_unitario, 'Subtotal:', item.subtotal);
-    return total + item.subtotal;
-  }, 0);
+    let costoEnvio = 0;
 
-  console.log('📦 Subtotal productos:', subtotal);
-
-  let costoEnvio = 0;
-
-  if (tipoEntrega === 'envio') {
-    switch(tipoEnvio) {
-      case 'cercano':
-        costoEnvio = preciosConfig.envio_cercano;
-        break;
-      case 'lejano':
-        costoEnvio = preciosConfig.envio_lejano;
-        break;
-      case 'la_banda':
-        costoEnvio = preciosConfig.envio_la_banda;
-        break;
-      case 'gratis':
-        costoEnvio = 0;
-        break;
+    if (tipoEntrega === 'envio') {
+      switch (tipoEnvio) {
+        case 'cercano':
+          costoEnvio = preciosConfig.envio_cercano;
+          break;
+        case 'lejano':
+          costoEnvio = preciosConfig.envio_lejano;
+          break;
+        case 'la_banda':
+          costoEnvio = preciosConfig.envio_la_banda;
+          break;
+        case 'gratis':
+          costoEnvio = 0;
+          break;
+      }
     }
-  }
 
-  console.log('🚚 Costo envío:', costoEnvio);
-  console.log('🎯 Tipo entrega:', tipoEntrega, 'Tipo envío:', tipoEnvio);
-
-  const total = subtotal + costoEnvio;
-  console.log('💰 Total final:', total);
-
-  setPrecioFinal(total);
-};
+    const total = subtotal + costoEnvio;
+    setPrecioFinal(total);
+  };
 
   const getLabelTipoMedida = (tipo: string) => {
     const labels: { [key: string]: string } = {
@@ -359,8 +352,10 @@ useEffect(() => {
     checkAndResetSequence();
   };
 
+  const subtotalProductos = itemsPedido.reduce((total, item) => total + item.subtotal, 0);
+
   return (
-    <div className="max-w-2xl mx-auto p-4">
+    <div className="max-w-4xl mx-auto p-4">
       <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
         <h2 className="text-2xl font-bold mb-6">Nuevo Pedido</h2>
 
@@ -510,38 +505,68 @@ useEffect(() => {
         <div className="space-y-4">
           <label className="block text-gray-700 font-semibold">Productos del Pedido</label>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-start">
             <select
               value={productoSeleccionado}
               onChange={(e) => setProductoSeleccionado(e.target.value)}
-              className="flex-1 p-2 border rounded"
+              className="flex-1 p-2 border rounded min-w-0" // Agregué min-w-0
             >
               <option value="">Seleccionar producto</option>
-              {productos.map(producto => (
-                <option key={producto.id} value={producto.id}>
-                  {producto.producto} - ${formatNumber(producto.precio || 0)}/{getLabelTipoMedida(producto.tipo_medida)}
-                </option>
-              ))}
+              {productos.map(producto => {
+                const stockDisponible = getStockDisponible(producto.id);
+                return (
+                  <option key={producto.id} value={producto.id} disabled={stockDisponible <= 0}>
+                    {producto.producto} - ${formatNumber(producto.precio || 0)}/{getLabelTipoMedida(producto.tipo_medida)}
+                    {stockDisponible <= 0 ? ' (SIN STOCK)' : ` (Stock: ${stockDisponible})`}
+                  </option>
+                );
+              })}
             </select>
 
-            <input
-              type="number"
-              value={cantidadProducto}
-              onChange={(e) => setCantidadProducto(Number(e.target.value))}
-              min="1"
-              step="0.1"
-              className="w-20 p-2 border rounded"
-              placeholder="Cant."
-            />
+            <div className="flex gap-2 flex-nowrap"> {/* Nuevo contenedor para cantidad y botón */}
+              <input
+                type="number"
+                value={cantidadProducto}
+                onChange={(e) => setCantidadProducto(Number(e.target.value))}
+                min="1"
+                step="0.1"
+                className="w-24 p-2 border rounded" // Aumenté el ancho a w-24
+                placeholder="Cant."
+              />
 
-            <button
-              type="button"
-              onClick={agregarProducto}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-            >
-              Agregar
-            </button>
+              <button
+                type="button"
+                onClick={agregarProducto}
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap" // Agregué whitespace-nowrap
+              >
+                Agregar
+              </button>
+            </div>
           </div>
+
+          {/* Mostrar stock disponible del producto seleccionado */}
+          {productoSeleccionado && (
+            <div className="text-sm text-gray-600 bg-blue-50 p-2 rounded">
+              {(() => {
+                const producto = productos.find(p => p.id === parseInt(productoSeleccionado));
+                if (producto) {
+                  const stockDisponible = getStockDisponible(producto.id);
+                  return (
+                    <>
+                      <strong>Stock disponible:</strong> {stockDisponible} {getLabelTipoMedida(producto.tipo_medida)}
+                      {stockDisponible <= 0 && (
+                        <span className="text-red-600 font-semibold ml-2"> - PRODUCTO AGOTADO</span>
+                      )}
+                      {stockDisponible > 0 && stockDisponible < 5 && (
+                        <span className="text-orange-600 font-semibold ml-2"> - ÚLTIMAS UNIDADES</span>
+                      )}
+                    </>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          )}
 
           {/* Lista de productos agregados */}
           {itemsPedido.length > 0 && (
@@ -557,25 +582,33 @@ useEffect(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  {itemsPedido.map((item, index) => (
-                    <tr key={index} className="border-t">
-                      <td className="p-2">{item.producto_nombre}</td>
-                      <td className="p-2">
-                        {item.cantidad} {getLabelTipoMedida(item.tipo_medida)}
-                      </td>
-                      <td className="p-2">${formatNumber(item.precio_unitario)}</td>
-                      <td className="p-2">${formatNumber(item.subtotal)}</td>
-                      <td className="p-2">
-                        <button
-                          type="button"
-                          onClick={() => eliminarProducto(index)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          ✕
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {itemsPedido.map((item, index) => {
+                    const stockDisponible = getStockDisponible(item.producto_id);
+                    return (
+                      <tr key={index} className="border-t">
+                        <td className="p-2">
+                          {item.producto_nombre}
+                          <div className="text-xs text-gray-500">
+                            Stock restante: {stockDisponible} {getLabelTipoMedida(item.tipo_medida)}
+                          </div>
+                        </td>
+                        <td className="p-2">
+                          {item.cantidad} {getLabelTipoMedida(item.tipo_medida)}
+                        </td>
+                        <td className="p-2">${formatNumber(item.precio_unitario)}</td>
+                        <td className="p-2">${formatNumber(item.subtotal)}</td>
+                        <td className="p-2">
+                          <button
+                            type="button"
+                            onClick={() => eliminarProducto(index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -694,11 +727,29 @@ useEffect(() => {
 
         {/* Total */}
         <div className="bg-blue-50 p-4 rounded-lg">
-          <div className="flex justify-between items-center">
-            <span className="text-lg font-bold">Total a pagar:</span>
-            <span className="text-2xl font-bold text-blue-600">
-              ${formatNumber(precioFinal)}
-            </span>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span>Subtotal Productos:</span>
+              <span>${formatNumber(subtotalProductos)}</span>
+            </div>
+
+            {tipoEntrega === 'envio' && tipoEnvio !== 'gratis' && (
+              <div className="flex justify-between">
+                <span>Costo de Envío:</span>
+                <span>+${formatNumber(
+                  tipoEnvio === 'cercano' ? preciosConfig.envio_cercano :
+                    tipoEnvio === 'lejano' ? preciosConfig.envio_lejano :
+                      tipoEnvio === 'la_banda' ? preciosConfig.envio_la_banda : 0
+                )}</span>
+              </div>
+            )}
+
+            <div className="flex justify-between text-lg font-bold pt-2 border-t">
+              <span>Total a pagar:</span>
+              <span className="text-2xl font-bold text-blue-600">
+                ${formatNumber(precioFinal)}
+              </span>
+            </div>
           </div>
         </div>
 

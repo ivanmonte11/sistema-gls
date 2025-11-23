@@ -84,60 +84,65 @@ export function TicketPedido({ pedido, onPedidoImpreso }: { pedido: Pedido; onPe
   };
 
   const generarHTMLTicket = () => {
-    const productos = obtenerProductosAgrupados();
-    const tieneProductosPapas = tienePapas();
+  const productos = obtenerProductosAgrupados();
+  const tieneProductosPapas = tienePapas();
 
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="es"><head><title>Ticket #${pedido.numero_pedido}</title><style>
-body { width: 80mm; font-family: Arial, sans-serif; font-size: 14px; padding: 5mm; }
-.header { text-align: center; font-weight: bold; margin-bottom: 5mm; }
+body { width: 80mm; font-family: Arial, sans-serif; font-size: 16px; padding: 5mm; }
+.header { text-align: center; font-weight: bold; margin-bottom: 5mm; font-size: 18px; }
 .divider { border-top: 1px dashed #000; margin: 3mm 0; }
-.footer { margin-top: 5mm; font-size: 12px; text-align: center; }
+.footer { margin-top: 5mm; font-size: 14px; text-align: center; }
 .hora-destacada {
   text-align: center; margin: 5mm 0; padding: 3mm; border: 2px solid #000;
   border-radius: 5px; background-color: #f8f8f8; font-weight: bold;
+  font-size: 16px;
 }
-.hora-texto { font-size: 1.3em; margin-top: 2mm; }
-.producto { margin: 4px 0; }
-.producto-cantidad { font-weight: bold; }
+.hora-texto { font-size: 1.5em; margin-top: 2mm; }
+.producto { margin: 8px 0; font-size: 18px; line-height: 1.3; } /* AUMENTÉ DE 16px A 18px Y AGREGUE LINE-HEIGHT */
+.producto-cantidad { font-weight: bold; font-size: 18px; } /* AUMENTÉ DE 16px A 18px */
+.producto-nombre { font-size: 18px; } /* NUEVA CLASE PARA EL NOMBRE DEL PRODUCTO */
+.cliente-nombre { font-size: 1.5em; font-weight: bold; letter-spacing: 0.5px; }
+.detalles-titulo { font-size: 1.4em; font-weight: bold; margin: 12px 0; text-align: center; } /* AUMENTÉ DE 1.3em A 1.4em */
+.total-precio { font-size: 1.3em; font-weight: bold; } /* AUMENTÉ DE 1.2em A 1.3em */
 </style></head><body onload="window.print();">
 <div class="header">GRANJA LA COLONIA</div>
 <div class="header">Francisco Viano 130 - Tel: 3856146824</div>
 <div class="divider"></div>
-<div class="header">PEDIDO #${pedido.numero_pedido}</div>
+<div class="header" style="font-size: 20px;">PEDIDO #${pedido.numero_pedido}</div>
 <div class="hora-destacada">
   <div>🕒 HORA DE ENTREGA 🕒</div>
   <div class="hora-texto">${pedido.hora_entrega_real || pedido.hora_entrega_solicitada || '--:--'}</div>
 </div>
 <div class="divider"></div>
 <div style="margin: 8px 0;">
-  <div style="font-size: 12px; color: #555;">CLIENTE</div>
-  <div style="font-size: 1.4em; font-weight: bold; letter-spacing: 0.5px;">${pedido.nombre_cliente.toUpperCase()}</div>
-  ${pedido.telefono_cliente ? `<div style="font-size: 1.1em; margin-top: 4px;">📞 ${pedido.telefono_cliente}</div>` : ''}
+  <div style="font-size: 14px; color: #555;">CLIENTE</div>
+  <div class="cliente-nombre">${pedido.nombre_cliente.toUpperCase()}</div>
+  ${pedido.telefono_cliente ? `<div style="font-size: 1.2em; margin-top: 4px;">📞 ${pedido.telefono_cliente}</div>` : ''}
 </div>
-<p><strong>Tipo entrega:</strong> ${
+<p style="font-size: 16px;"><strong>Tipo entrega:</strong> ${
   pedido.tipo_entrega === 'envio'
     ? `<span style="font-weight: bold">ENVÍO (${formatTipoEnvio(pedido.tipo_envio)})</span>`
     : '<span style="font-weight: bold">RETIRA EN LOCAL</span>'
 }</p>
-${pedido.tipo_entrega === 'envio' && pedido.direccion ? `<p><strong>Dirección:</strong> <span style="font-weight: bold">${pedido.direccion}</span></p>` : ''}
+${pedido.tipo_entrega === 'envio' && pedido.direccion ? `<p style="font-size: 16px;"><strong>Dirección:</strong> <span style="font-weight: bold">${pedido.direccion}</span></p>` : ''}
 <div class="divider"></div>
-<div style="text-align: center; font-weight: bold; font-size: 1.2em; margin: 10px 0;">📝 DETALLES DEL PEDIDO</div>
+<div class="detalles-titulo">📝 DETALLES DEL PEDIDO</div>
 ${productos.map(producto => `
   <div class="producto">
     <span class="producto-cantidad">${formatearCantidadConMedida(producto.cantidad, producto.tipo_medida, producto.nombre)}</span>
-    <span> ${producto.nombre}</span>
+    <span class="producto-nombre"> ${producto.nombre}</span>
   </div>
 `).join('')}
-${pedido.con_chimichurri ? `<div style="font-weight: bold; font-size: 1.1em; margin: 6px 0;">🌿 CHIMICHURRI INCLUIDO</div>` : ''}
-${productos.length === 0 ? '<div style="text-align: center; color: #999;">No hay productos</div>' : ''}
+${pedido.con_chimichurri ? `<div style="font-weight: bold; font-size: 1.3em; margin: 10px 0;">🌿 CHIMICHURRI INCLUIDO</div>` : ''} <!-- AUMENTÉ DE 1.2em A 1.3em -->
+${productos.length === 0 ? '<div style="text-align: center; color: #999; font-size: 18px;">No hay productos</div>' : ''} <!-- AUMENTÉ DE 16px A 18px -->
 <div class="divider"></div>
-<p><strong>TOTAL:</strong> ${formatPrecio(pedido.precio_total)}</p>
-<p><strong>Método pago:</strong> ${formatMetodoPago(pedido.metodo_pago)}</p>
+<p style="font-size: 16px;"><strong>TOTAL:</strong> <span class="total-precio">${formatPrecio(pedido.precio_total)}</span></p>
+<p style="font-size: 16px;"><strong>Método pago:</strong> ${formatMetodoPago(pedido.metodo_pago)}</p>
 <div class="divider"></div>
 <div class="footer">${pedido.estado === 'entregado' ? `Entregado: ${pedido.hora_entrega_real || '--:--'}` : 'Pendiente de entrega'}<br>¡Gracias por su compra!</div>
 </body></html>`;
-  };
+};
 
   const imprimirTicket = async () => {
     setIsPrinting(true);

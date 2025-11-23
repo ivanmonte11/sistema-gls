@@ -152,6 +152,7 @@ export default function GestionStockPage() {
             <option value="gramo">Gramo</option>
             <option value="litro">Litro</option>
             <option value="docena">Docena</option>
+            <option value="media_docena">1/2 Docena</option>
             <option value="porcion">Porción</option>
           </select>
           <select

@@ -32,7 +32,8 @@ export default function TablaStock({
     setProductosLocales(productos);
   }, [productos]);
 
-  const tiposMedida = ['unidad', 'kilo', 'gramo', 'litro', 'docena', 'porcion'];
+  // AGREGAR 'media_docena' A LOS TIPOS DE MEDIDA
+  const tiposMedida = ['unidad', 'kilo', 'gramo', 'litro', 'docena', 'media_docena', 'porcion'];
   const categorias = ['Pollos', 'Papas', 'Bebidas', 'Acompañamientos', 'Postres', 'Otros'];
 
   const iniciarEdicion = (producto: ProductoStock) => {
@@ -70,6 +71,7 @@ export default function TablaStock({
       gramo: 'g',
       litro: 'L',
       docena: 'docenas',
+      media_docena: '1/2 docena', // NUEVA ETIQUETA
       porcion: 'porciones'
     };
     return labels[tipo] || tipo;
@@ -79,6 +81,12 @@ export default function TablaStock({
     if (producto.tipo_medida === 'kilo' && producto.cantidad < 1) {
       return `${(producto.cantidad * 1000).toFixed(0)}g`;
     }
+
+    // Mostrar de forma especial para media_docena
+    if (producto.tipo_medida === 'media_docena') {
+      return `${producto.cantidad} 1/2 docena${producto.cantidad > 1 ? 's' : ''}`;
+    }
+
     return `${formatNumber(producto.cantidad)} ${getLabelTipoMedida(producto.tipo_medida)}`;
   };
 
@@ -142,7 +150,9 @@ export default function TablaStock({
                           className="w-32 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                           {tiposMedida.map(tipo => (
-                            <option key={tipo} value={tipo}>{tipo}</option>
+                            <option key={tipo} value={tipo}>
+                              {getLabelTipoMedida(tipo)}
+                            </option>
                           ))}
                         </select>
                       </div>
