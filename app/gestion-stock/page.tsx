@@ -149,11 +149,13 @@ export default function GestionStockPage() {
           >
             <option value="unidad">Unidad</option>
             <option value="kilo">Kilo</option>
+            <option value="medio_kilo">1/2 Kilo</option>
             <option value="gramo">Gramo</option>
             <option value="litro">Litro</option>
             <option value="docena">Docena</option>
             <option value="media_docena">1/2 Docena</option>
             <option value="porcion">Porción</option>
+            <option value="media_porcion">1/2 Porción</option>
           </select>
           <select
             value={nuevoProducto.categoria}

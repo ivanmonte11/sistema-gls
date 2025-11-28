@@ -150,7 +150,7 @@ export default function FormularioPedido() {
           setPreciosConfig(prev => ({
             ...prev,
             ...preciosMap,
-            medio_pollo: preciosMap.medio_pollo || 1000
+            medio_pollo_recargo: preciosMap.medio_pollo_recargo
           }));
         }
       }
@@ -172,11 +172,41 @@ export default function FormularioPedido() {
     return producto.cantidad - stockReservado;
   };
 
+  // Función mejorada para detectar medio pollo
+  const esMedioPollo = (item: ItemPedido): boolean => {
+    const nombreLower = item.producto_nombre.toLowerCase();
+    const esProductoPollo = nombreLower.includes('pollo');
+    const esMedio = item.cantidad === 0.5;
+
+    return esProductoPollo && esMedio;
+  };
+
+  // Función para calcular el cargo adicional total para medio pollo
+  const calcularCargoMedioPollo = () => {
+  let cargoTotal = 0;
+
+  itemsPedido.forEach(item => {
+    if (esMedioPollo(item)) {
+      const producto = productos.find(p => p.id === item.producto_id);
+      if (producto && producto.precio) {
+        const medioPolloSinCargo = producto.precio / 2;
+        const cargoPorUnidad = item.precio_unitario - medioPolloSinCargo;
+        cargoTotal += cargoPorUnidad;
+      }
+    }
+  });
+
+  return cargoTotal;
+};
+
   const agregarProducto = () => {
     if (!productoSeleccionado || cantidadProducto <= 0) return;
 
     const producto = productos.find(p => p.id === parseInt(productoSeleccionado));
-    if (!producto || !producto.precio) return;
+    if (!producto || !producto.precio) {
+      alert('Este producto no tiene precio configurado');
+      return;
+    }
 
     // Verificar stock disponible
     const stockDisponible = getStockDisponible(producto.id);
@@ -185,14 +215,42 @@ export default function FormularioPedido() {
       return;
     }
 
+    // CALCULAR PRECIO - NUEVA LÓGICA
+    let precioFinal = producto.precio;
+    let subtotal = producto.precio * cantidadProducto;
+    let esMedioPolloProducto = false;
+
+    // Si es POLLO y la cantidad es 0.5 (medio pollo)
+    if (producto.producto.toLowerCase().includes('pollo') && cantidadProducto === 0.5) {
+      const cargoAdicional = preciosConfig.medio_pollo;
+
+      // Precio = (Pollo entero / 2) + cargo adicional
+      precioFinal = (producto.precio / 2) + cargoAdicional;
+      subtotal = precioFinal; // Como es 0.5, el subtotal es igual al precio final
+      esMedioPolloProducto = true;
+
+      console.log('🍗 Medio pollo calculado:', {
+        precioPolloEntero: producto.precio,
+        medioPolloSinCargo: producto.precio / 2,
+        cargoAdicional,
+        precioFinal,
+        subtotal
+      });
+    }
+
     const nuevoItem: ItemPedido = {
       producto_id: producto.id,
       producto_nombre: producto.producto,
       cantidad: cantidadProducto,
-      precio_unitario: producto.precio,
-      subtotal: producto.precio * cantidadProducto,
+      precio_unitario: precioFinal,
+      subtotal: subtotal,
       tipo_medida: producto.tipo_medida
     };
+
+    console.log('➕ Nuevo item:', {
+      ...nuevoItem,
+      esMedioPollo: esMedioPolloProducto
+    });
 
     setItemsPedido([...itemsPedido, nuevoItem]);
     setProductoSeleccionado('');
@@ -352,7 +410,22 @@ export default function FormularioPedido() {
     checkAndResetSequence();
   };
 
-  const subtotalProductos = itemsPedido.reduce((total, item) => total + item.subtotal, 0);
+  // Calcular valores para el desglose - CORREGIDO
+  const cargoMedioPollo = calcularCargoMedioPollo();
+  const subtotalSinCargo = itemsPedido.reduce((total, item) => {
+    const producto = productos.find(p => p.id === item.producto_id);
+
+    if (!producto?.precio) return total;
+
+    if (esMedioPollo(item)) {
+      // Para medio pollo: sumamos el precio base completo (11,000) sin multiplicar por 0.5
+      return total + (producto.precio / 2);
+    } else {
+      // Para otros productos: precio normal multiplicado por cantidad
+      return total + (producto.precio * item.cantidad);
+    }
+  }, 0);
+
 
   return (
     <div className="max-w-4xl mx-auto p-4">
@@ -509,7 +582,7 @@ export default function FormularioPedido() {
             <select
               value={productoSeleccionado}
               onChange={(e) => setProductoSeleccionado(e.target.value)}
-              className="flex-1 p-2 border rounded min-w-0" // Agregué min-w-0
+              className="flex-1 p-2 border rounded min-w-0"
             >
               <option value="">Seleccionar producto</option>
               {productos.map(producto => {
@@ -523,21 +596,21 @@ export default function FormularioPedido() {
               })}
             </select>
 
-            <div className="flex gap-2 flex-nowrap"> {/* Nuevo contenedor para cantidad y botón */}
+            <div className="flex gap-2 flex-nowrap">
               <input
                 type="number"
                 value={cantidadProducto}
                 onChange={(e) => setCantidadProducto(Number(e.target.value))}
-                min="1"
+                min="0.1"
                 step="0.1"
-                className="w-24 p-2 border rounded" // Aumenté el ancho a w-24
+                className="w-24 p-2 border rounded"
                 placeholder="Cant."
               />
 
               <button
                 type="button"
                 onClick={agregarProducto}
-                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap" // Agregué whitespace-nowrap
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 whitespace-nowrap"
               >
                 Agregar
               </button>
@@ -584,18 +657,33 @@ export default function FormularioPedido() {
                 <tbody>
                   {itemsPedido.map((item, index) => {
                     const stockDisponible = getStockDisponible(item.producto_id);
+                    const esProductoMedioPollo = esMedioPollo(item);
+                    const producto = productos.find(p => p.id === item.producto_id);
+
                     return (
                       <tr key={index} className="border-t">
                         <td className="p-2">
                           {item.producto_nombre}
+                          {esProductoMedioPollo && (
+                            <div className="text-xs text-orange-600 font-semibold">
+                              (Medio pollo - incluye cargo adicional)
+                            </div>
+                          )}
                           <div className="text-xs text-gray-500">
                             Stock restante: {stockDisponible} {getLabelTipoMedida(item.tipo_medida)}
                           </div>
                         </td>
                         <td className="p-2">
-                          {item.cantidad} {getLabelTipoMedida(item.tipo_medida)}
+                          {item.cantidad === 0.5 ? '1/2' : item.cantidad} {getLabelTipoMedida(item.tipo_medida)}
                         </td>
-                        <td className="p-2">${formatNumber(item.precio_unitario)}</td>
+                        <td className="p-2">
+                          ${formatNumber(item.precio_unitario)}
+                          {esProductoMedioPollo && producto && producto.precio && (
+                            <div className="text-xs text-gray-500">
+                              (Base: ${formatNumber(producto.precio / 2)} + ${formatNumber(preciosConfig.medio_pollo )})
+                            </div>
+                          )}
+                        </td>
                         <td className="p-2">${formatNumber(item.subtotal)}</td>
                         <td className="p-2">
                           <button
@@ -728,10 +816,19 @@ export default function FormularioPedido() {
         {/* Total */}
         <div className="bg-blue-50 p-4 rounded-lg">
           <div className="space-y-2">
+            {/* Mostrar subtotal sin cargos adicionales */}
             <div className="flex justify-between">
-              <span>Subtotal Productos:</span>
-              <span>${formatNumber(subtotalProductos)}</span>
+              <span>Subtotal:</span>
+              <span>${formatNumber(subtotalSinCargo)}</span>
             </div>
+
+            {/* Mostrar cargo adicional por medio pollo si existe */}
+            {cargoMedioPollo > 0 && (
+              <div className="flex justify-between text-orange-600">
+                <span>Recargo por medio pollo:</span>
+                <span>+${formatNumber(cargoMedioPollo)}</span>
+              </div>
+            )}
 
             {tipoEntrega === 'envio' && tipoEnvio !== 'gratis' && (
               <div className="flex justify-between">

@@ -32,8 +32,8 @@ export default function TablaStock({
     setProductosLocales(productos);
   }, [productos]);
 
-  // AGREGAR 'media_docena' A LOS TIPOS DE MEDIDA
-  const tiposMedida = ['unidad', 'kilo', 'gramo', 'litro', 'docena', 'media_docena', 'porcion'];
+  // TIPOS DE MEDIDA CORREGIDOS
+  const tiposMedida = ['unidad', 'kilo', 'medio_kilo', 'gramo', 'litro', 'docena', 'media_docena', 'porcion', 'media_porcion'];
   const categorias = ['Pollos', 'Papas', 'Bebidas', 'Acompañamientos', 'Postres', 'Otros'];
 
   const iniciarEdicion = (producto: ProductoStock) => {
@@ -68,11 +68,13 @@ export default function TablaStock({
     const labels: { [key: string]: string } = {
       unidad: 'unidades',
       kilo: 'kg',
+      medio_kilo: '1/2 kg',
       gramo: 'g',
       litro: 'L',
       docena: 'docenas',
-      media_docena: '1/2 docena', // NUEVA ETIQUETA
-      porcion: 'porciones'
+      media_docena: '1/2 docena',
+      porcion: 'porciones',
+      media_porcion: '1/2 porción' // CORREGIDO - faltaba coma
     };
     return labels[tipo] || tipo;
   };
@@ -82,9 +84,15 @@ export default function TablaStock({
       return `${(producto.cantidad * 1000).toFixed(0)}g`;
     }
 
-    // Mostrar de forma especial para media_docena
+    // Mostrar de forma especial para medidas fraccionarias
     if (producto.tipo_medida === 'media_docena') {
       return `${producto.cantidad} 1/2 docena${producto.cantidad > 1 ? 's' : ''}`;
+    }
+    if (producto.tipo_medida === 'medio_kilo') {
+      return `${producto.cantidad} 1/2 kg`;
+    }
+    if (producto.tipo_medida === 'media_porcion') {
+      return `${producto.cantidad} 1/2 porción${producto.cantidad > 1 ? 'es' : ''}`;
     }
 
     return `${formatNumber(producto.cantidad)} ${getLabelTipoMedida(producto.tipo_medida)}`;
