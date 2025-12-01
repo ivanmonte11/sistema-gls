@@ -183,21 +183,21 @@ export default function FormularioPedido() {
 
   // Función para calcular el cargo adicional total para medio pollo
   const calcularCargoMedioPollo = () => {
-  let cargoTotal = 0;
+    let cargoTotal = 0;
 
-  itemsPedido.forEach(item => {
-    if (esMedioPollo(item)) {
-      const producto = productos.find(p => p.id === item.producto_id);
-      if (producto && producto.precio) {
-        const medioPolloSinCargo = producto.precio / 2;
-        const cargoPorUnidad = item.precio_unitario - medioPolloSinCargo;
-        cargoTotal += cargoPorUnidad;
+    itemsPedido.forEach(item => {
+      if (esMedioPollo(item)) {
+        const producto = productos.find(p => p.id === item.producto_id);
+        if (producto && producto.precio) {
+          const medioPolloSinCargo = producto.precio / 2;
+          const cargoPorUnidad = item.precio_unitario - medioPolloSinCargo;
+          cargoTotal += cargoPorUnidad;
+        }
       }
-    }
-  });
+    });
 
-  return cargoTotal;
-};
+    return cargoTotal;
+  };
 
   const agregarProducto = () => {
     if (!productoSeleccionado || cantidadProducto <= 0) return;
@@ -448,6 +448,7 @@ export default function FormularioPedido() {
                   setBusquedaCliente('');
                   setTelefono('');
                   setDireccion('');
+                  setMostrarSugerencias(false);
                 }}
                 className="mr-2"
               />
@@ -471,11 +472,16 @@ export default function FormularioPedido() {
                   type="text"
                   value={busquedaCliente}
                   onChange={(e) => {
-                    setBusquedaCliente(e.target.value);
-                    if (!e.target.value) {
+                    const valor = e.target.value;
+                    setBusquedaCliente(valor);
+
+                    if (!valor) {
                       setCliente(null);
                       setTelefono('');
                       setDireccion('');
+                      setMostrarSugerencias(false);
+                    } else if (valor.length > 2) {
+                      setMostrarSugerencias(true);
                     }
                   }}
                   placeholder="Nombre o teléfono..."
@@ -485,7 +491,6 @@ export default function FormularioPedido() {
                       setMostrarSugerencias(true);
                     }
                   }}
-                  onBlur={() => setTimeout(() => setMostrarSugerencias(false), 200)}
                 />
                 {cliente && (
                   <button
@@ -495,6 +500,7 @@ export default function FormularioPedido() {
                       setBusquedaCliente('');
                       setTelefono('');
                       setDireccion('');
+                      setMostrarSugerencias(false);
                     }}
                     className="ml-2 text-gray-500 hover:text-gray-700"
                     title="Borrar selección"
@@ -513,7 +519,10 @@ export default function FormularioPedido() {
               )}
 
               {mostrarSugerencias && clientesSugeridos.length > 0 && (
-                <ul className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-auto">
+                <ul
+                  className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-auto"
+                  onMouseLeave={() => setTimeout(() => setMostrarSugerencias(false), 200)}
+                >
                   {clientesSugeridos.map((cliente) => (
                     <li
                       key={cliente.id}
@@ -524,6 +533,7 @@ export default function FormularioPedido() {
                         setDireccion(cliente.address || '');
                         setMostrarSugerencias(false);
                       }}
+                      onMouseDown={(e) => e.preventDefault()}
                       className="p-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
                     >
                       <div className="font-medium">{cliente.name}</div>
@@ -680,7 +690,7 @@ export default function FormularioPedido() {
                           ${formatNumber(item.precio_unitario)}
                           {esProductoMedioPollo && producto && producto.precio && (
                             <div className="text-xs text-gray-500">
-                              (Base: ${formatNumber(producto.precio / 2)} + ${formatNumber(preciosConfig.medio_pollo )})
+                              (Base: ${formatNumber(producto.precio / 2)} + ${formatNumber(preciosConfig.medio_pollo)})
                             </div>
                           )}
                         </td>
