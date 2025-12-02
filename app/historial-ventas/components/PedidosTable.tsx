@@ -21,7 +21,7 @@ interface PedidosTableProps {
   pedidosEntregados: Pedido[];
   setPedidoAEditar: (pedido: Pedido | null) => void;
   actualizarEstadoPedido: (id: number, estado: string) => Promise<boolean>;
-  onPedidoImpreso?: () => void;
+  onPedidoImpreso: (pedidoId: number) => void; // CAMBIADO: ahora recibe el ID
 }
 
 export const PedidosTable = ({
@@ -55,6 +55,13 @@ export const PedidosTable = ({
       (pedido.telefono_cliente && pedido.telefono_cliente.includes(term))
     );
   }, [pedidos, pedidosEntregados, activeTab, searchTerm]);
+
+  // Función para manejar la impresión
+  const handlePedidoImpreso = (pedidoId: number) => {
+    if (onPedidoImpreso) {
+      onPedidoImpreso(pedidoId);
+    }
+  };
 
   return (
     <>
@@ -180,9 +187,10 @@ export const PedidosTable = ({
                     <td className="px-4 py-3 font-semibold">{formatPrecio(pedido.precio_total)}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col space-y-2">
+                        {/* TicketPedido con la prop correcta */}
                         <TicketPedido
                           pedido={pedido}
-                          onPedidoImpreso={onPedidoImpreso}
+                           onPedidoImpreso={onPedidoImpreso}
                         />
 
                         <button

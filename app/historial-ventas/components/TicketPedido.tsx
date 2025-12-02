@@ -1,14 +1,24 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pedido } from '../types/pedidos.types';
-import {
-  formatearCantidadConMedida,
-  obtenerIconoProducto
-} from '../utils/formatters';
+import { formatearCantidadConMedida } from '../utils/formatters';
 
-export function TicketPedido({ pedido, onPedidoImpreso }: { pedido: Pedido; onPedidoImpreso?: () => void }) {
+export function TicketPedido({
+  pedido,
+  onPedidoImpreso
+}: {
+  pedido: Pedido;
+  onPedidoImpreso?: (pedidoId: number) => void;
+}) {
   const [isPrinting, setIsPrinting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [localImpreso, setLocalImpreso] = useState(false);
+
+  // FIX: Sincronizar cuando cambia el pedido
+  useEffect(() => {
+    // Si pedido.impreso es true, 1 o 'true', usar true, de lo contrario false
+    const impresoValor = Boolean(pedido.impreso);
+    setLocalImpreso(impresoValor);
+  }, [pedido.impreso]);
 
   const formatPrecio = (precio: number | string): string => {
     const numero = typeof precio === 'string' ? parseFloat(precio) : precio;
@@ -36,17 +46,14 @@ export function TicketPedido({ pedido, onPedidoImpreso }: { pedido: Pedido; onPe
     return tipos[tipo] || tipo;
   };
 
-  // Función para obtener productos agrupados
   const obtenerProductosAgrupados = () => {
     if (!pedido.items || !Array.isArray(pedido.items)) return [];
-
     const productosAgrupados: Record<string, { cantidad: number, tipo_medida: string }> = {};
 
     pedido.items.forEach(item => {
       const nombre = item.producto_nombre || 'Producto sin nombre';
       const cantidad = parseFloat(item.cantidad.toString()) || 0;
       const tipo_medida = item.tipo_medida || 'unidad';
-
       const clave = `${nombre}-${tipo_medida}`;
 
       if (productosAgrupados[clave]) {
@@ -63,31 +70,10 @@ export function TicketPedido({ pedido, onPedidoImpreso }: { pedido: Pedido; onPe
     }));
   };
 
-  // Verificar si tiene papas
-  const tienePapas = () => {
-    return pedido.items?.some(item =>
-      item.producto_nombre?.toLowerCase().includes('papa') ||
-      item.producto_nombre?.toLowerCase().includes('papas')
-    ) || false;
-  };
-
-  const marcarComoImpreso = async () => {
-    try {
-      await fetch('/api/pedidos', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: pedido.id, impreso: true })
-      });
-    } catch (err) {
-      console.error('Error al marcar como impreso en el backend:', err);
-    }
-  };
-
   const generarHTMLTicket = () => {
-  const productos = obtenerProductosAgrupados();
-  const tieneProductosPapas = tienePapas();
+    const productos = obtenerProductosAgrupados();
 
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="es"><head><title>Ticket #${pedido.numero_pedido}</title><style>
 body { width: 80mm; font-family: Arial, sans-serif; font-size: 14px; padding: 5mm; }
 .header { text-align: center; font-weight: bold; margin-bottom: 5mm; font-size: 16px; }
@@ -96,12 +82,12 @@ body { width: 80mm; font-family: Arial, sans-serif; font-size: 14px; padding: 5m
 .hora-destacada {
   text-align: center; margin: 5mm 0; padding: 3mm; border: 2px solid #000;
   border-radius: 5px; background-color: #f8f8f8; font-weight: bold;
-  font-size: 14px; /* REDUCIDO DE 16px A 14px */
+  font-size: 14px;
 }
 .hora-texto { font-size: 1.3em; margin-top: 2mm; }
 .producto { margin: 6px 0; font-size: 14px; line-height: 1.3; }
 .producto-cantidad { font-weight: bold; font-size: 14px; }
-.producto-nombre { font-size: 14px; } /* REDUCIDO DE 18px A 14px */
+.producto-nombre { font-size: 14px; }
 .cliente-nombre { font-size: 1.3em; font-weight: bold; letter-spacing: 0.5px; }
 .detalles-titulo { font-size: 1.2em; font-weight: bold; margin: 10px 0; text-align: center; }
 .total-precio { font-size: 1.1em; font-weight: bold; }
@@ -121,10 +107,10 @@ body { width: 80mm; font-family: Arial, sans-serif; font-size: 14px; padding: 5m
   ${pedido.telefono_cliente ? `<div style="font-size: 1.1em; margin-top: 4px;">📞 ${pedido.telefono_cliente}</div>` : ''}
 </div>
 <p style="font-size: 14px;"><strong>Tipo entrega:</strong> ${
-  pedido.tipo_entrega === 'envio'
-    ? `<span style="font-weight: bold">ENVÍO (${formatTipoEnvio(pedido.tipo_envio)})</span>`
-    : '<span style="font-weight: bold">RETIRA EN LOCAL</span>'
-}</p>
+      pedido.tipo_entrega === 'envio'
+        ? `<span style="font-weight: bold">ENVÍO (${formatTipoEnvio(pedido.tipo_envio)})</span>`
+        : '<span style="font-weight: bold">RETIRA EN LOCAL</span>'
+    }</p>
 ${pedido.tipo_entrega === 'envio' && pedido.direccion ? `<p style="font-size: 14px;"><strong>Dirección:</strong> <span style="font-weight: bold">${pedido.direccion}</span></p>` : ''}
 <div class="divider"></div>
 <div class="detalles-titulo">📝 DETALLES DEL PEDIDO</div>
@@ -134,22 +120,21 @@ ${productos.map(producto => `
     <span class="producto-nombre"> ${producto.nombre}</span>
   </div>
 `).join('')}
-${pedido.con_chimichurri ? `<div style="font-weight: bold; font-size: 1.1em; margin: 8px 0;">🌿 CHIMICHURRI INCLUIDO</div>` : ''} <!-- REDUCIDO DE 1.3em A 1.1em -->
-${productos.length === 0 ? '<div style="text-align: center; color: #999; font-size: 14px;">No hay productos</div>' : ''} <!-- REDUCIDO DE 18px A 14px -->
+${pedido.con_chimichurri ? `<div style="font-weight: bold; font-size: 1.1em; margin: 8px 0;">🌿 CHIMICHURRI INCLUIDO</div>` : ''}
+${productos.length === 0 ? '<div style="text-align: center; color: #999; font-size: 14px;">No hay productos</div>' : ''}
 <div class="divider"></div>
 <p style="font-size: 14px;"><strong>TOTAL:</strong> <span class="total-precio">${formatPrecio(pedido.precio_total)}</span></p>
 <p style="font-size: 14px;"><strong>Método pago:</strong> ${formatMetodoPago(pedido.metodo_pago)}</p>
 <div class="divider"></div>
 <div class="footer">${pedido.estado === 'entregado' ? `Entregado: ${pedido.hora_entrega_real || '--:--'}` : 'Pendiente de entrega'}<br>¡Gracias por su compra!</div>
 </body></html>`;
-};
+  };
 
   const imprimirTicket = async () => {
     setIsPrinting(true);
-    setError(null);
-    let impresionExitosa = false;
 
     try {
+      // Intentar imprimir con la API
       const response = await fetch(`${process.env.NEXT_PUBLIC_IMPRESORA_API}/api/imprimir`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,41 +143,49 @@ ${productos.length === 0 ? '<div style="text-align: center; color: #999; font-si
 
       const result = await response.json();
       if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Error al imprimir el ticket');
+        // Fallback a impresión en ventana
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(generarHTMLTicket());
+          printWindow.document.close();
+        }
       }
 
-      impresionExitosa = true;
-    } catch (err) {
-      console.error('Error con API de impresión, se usará fallback:', err);
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      // Siempre marcar como impreso y notificar
+      await fetch('/api/pedidos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pedido.id, impreso: true })
+      });
 
+      setLocalImpreso(true);
+      onPedidoImpreso?.(pedido.id);
+
+    } catch (err) {
+      console.error('Error al imprimir:', err);
+      // Fallback a impresión en ventana
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(generarHTMLTicket());
         printWindow.document.close();
-        impresionExitosa = true;
       }
-    }
 
-    if (impresionExitosa) {
-      await marcarComoImpreso();
-      onPedidoImpreso?.();
+      // También marcar como impreso en caso de error
+      setLocalImpreso(true);
+      onPedidoImpreso?.(pedido.id);
+    } finally {
+      setIsPrinting(false);
     }
-
-    setIsPrinting(false);
   };
 
   return (
     <button
       onClick={imprimirTicket}
-      disabled={isPrinting || pedido.impreso}
-      className={`
-        bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors
-        ${isPrinting ? 'opacity-50 cursor-not-allowed' : ''}
-        ${pedido.impreso ? '!bg-green-500 hover:!bg-green-500' : ''}
-      `}
+      disabled={isPrinting}
+      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      {pedido.impreso ? '✓ Impreso' : isPrinting ? 'Imprimiendo...' : 'Imprimir Ticket'}
+      {isPrinting ? 'Imprimiendo...' :
+        (localImpreso ? 'Reimprimir Ticket' : 'Imprimir Ticket')}
     </button>
   );
 }

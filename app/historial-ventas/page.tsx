@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { addDays, format } from 'date-fns'; // Añadimos format aquí
+import { addDays, format } from 'date-fns';
 import { DateSelector } from './components/DateSelector';
 import { PedidosTable } from './components/PedidosTable';
 import { ResumenEstadisticas } from './components/ResumenEstadisticas';
@@ -68,7 +68,31 @@ export default function HistorialVentas() {
     setError(null);
   };
 
-  // Función para recargar los datos
+  // FUNCIÓN CLAVE: Actualizar el estado de impreso de un pedido específico
+  const handlePedidoImpreso = (pedidoId: number) => {
+    console.log('Actualizando pedido impreso:', pedidoId);
+
+    // Actualizar en localPedidos
+    setLocalPedidos(prev => prev.map(pedido =>
+      pedido.id === pedidoId ? { ...pedido, impreso: true } : pedido
+    ));
+
+    // Actualizar en localEntregados si está ahí
+    setLocalEntregados(prev => prev.map(pedido =>
+      pedido.id === pedidoId ? { ...pedido, impreso: true } : pedido
+    ));
+
+    // También actualizar en los estados del hook
+    setPedidos(prev => prev.map(pedido =>
+      pedido.id === pedidoId ? { ...pedido, impreso: true } : pedido
+    ));
+
+    setPedidosEntregados(prev => prev.map(pedido =>
+      pedido.id === pedidoId ? { ...pedido, impreso: true } : pedido
+    ));
+  };
+
+  // Función para recargar los datos (mantener para otras actualizaciones)
   const reloadData = async () => {
     const fechaFormateada = format(fechaSeleccionada, 'yyyy-MM-dd');
     const response = await fetch(`/api/pedidos?fecha=${fechaFormateada}`);
@@ -102,7 +126,7 @@ export default function HistorialVentas() {
         pedidosEntregados={localEntregados}
         setPedidoAEditar={setPedidoAEditar}
         actualizarEstadoPedido={actualizarEstadoPedido}
-        onPedidoImpreso={reloadData}
+        onPedidoImpreso={handlePedidoImpreso} // ¡CAMBIADO AQUÍ!
       />
 
       {pedidoAEditar && (
