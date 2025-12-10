@@ -36,7 +36,7 @@ model pedidos {
   estado                  String?   @default("pendiente") @db.VarChar(20)
   hora_entrega_real       DateTime? @db.Timestamp(6)
   fecha_actualizacion     DateTime? @db.Timestamptz(6)
-  impreso                 Boolean?  @default(false)
+  impreso                 Boolean  @default(false)
   client_id               Int?
   cliente_eventual        Boolean?  @default(false)
   clients                 clients?  @relation(fields: [client_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

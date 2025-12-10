@@ -9,6 +9,7 @@ import {
 } from '../services/pedidos.service';
 import pool from '@/lib/db';
 import { validarPedido, validarActualizacionEstado } from '../utils/validators.utils';
+import { TIMEZONE } from '../utils/fecha.utils';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -134,7 +135,7 @@ export async function POST(request: Request) {
   }
 }
 
-// Los métodos PATCH, PUT se mantienen igual...
+
 export async function PATCH(request: Request) {
   try {
     if (!request.headers.get('content-type')?.includes('application/json')) {
@@ -150,13 +151,16 @@ export async function PATCH(request: Request) {
     // ✅ Manejar pedidos impresos directamente
     if (data.impreso === true && typeof data.id === 'number') {
       try {
-        await marcarPedidoComoImpreso(data.id);
+        console.log(`🖨️ Marcando pedido ${data.id} como impreso...`);
+        await marcarPedidoComoImpreso(data.id); // ¡ESTA FUNCIÓN NO ESTÁ SIENDO IMPORTADA!
+        console.log(`✅ Pedido ${data.id} marcado como impreso`);
+
         return NextResponse.json({
           success: true,
           message: 'Pedido marcado como impreso'
         });
       } catch (err) {
-        console.error('Error al marcar como impreso:', err);
+        console.error('❌ Error al marcar como impreso:', err);
         return NextResponse.json(
           { success: false, error: 'No se pudo marcar como impreso' },
           { status: 500 }

@@ -13,12 +13,10 @@ export function TicketPedido({
   const [isPrinting, setIsPrinting] = useState(false);
   const [localImpreso, setLocalImpreso] = useState(false);
 
-  // FIX: Sincronizar cuando cambia el pedido
   useEffect(() => {
-    // Si pedido.impreso es true, 1 o 'true', usar true, de lo contrario false
-    const impresoValor = Boolean(pedido.impreso);
-    setLocalImpreso(impresoValor);
-  }, [pedido.impreso]);
+    console.log(`🔍 TicketPedido ${pedido.id} - impreso recibido:`, pedido.impreso);
+    setLocalImpreso(pedido.impreso || false);
+  }, [pedido.id, pedido.impreso]);
 
   const formatPrecio = (precio: number | string): string => {
     const numero = typeof precio === 'string' ? parseFloat(precio) : precio;
@@ -130,52 +128,103 @@ ${productos.length === 0 ? '<div style="text-align: center; color: #999; font-si
 </body></html>`;
   };
 
+  const marcarComoImpresoEnBackend = async (): Promise<boolean> => {
+    try {
+      console.log(`📤 Enviando PATCH para pedido ${pedido.id}...`);
+      const response = await fetch('/api/pedidos', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        body: JSON.stringify({
+          id: pedido.id,
+          impreso: true
+        })
+      });
+
+      if (!response.ok) {
+        console.error(`❌ PATCH falló: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        return false;
+      }
+
+      const result = await response.json();
+      console.log(`✅ PATCH exitoso:`, result);
+      return result.success === true;
+
+    } catch (error) {
+      console.error('❌ Error en marcarComoImpresoEnBackend:', error);
+      return false;
+    }
+  };
+
   const imprimirTicket = async () => {
+    console.log(`🎯 Iniciando impresión para pedido ${pedido.id}`);
+    console.log(`📊 Estado antes: localImpreso=${localImpreso}, pedido.impreso=${pedido.impreso}`);
+
     setIsPrinting(true);
 
+    // 1. PRIMERO: Marcar como impreso en backend
+    const marcadoExitoso = await marcarComoImpresoEnBackend();
+
+    if (marcadoExitoso) {
+      // 2. Actualizar UI inmediatamente
+      setLocalImpreso(true);
+      console.log(`✅ UI actualizada: localImpreso=true`);
+
+      // 3. Notificar al padre
+      onPedidoImpreso?.(pedido.id);
+      console.log(`📤 Padre notificado para ${pedido.id}`);
+    } else {
+      console.warn(`⚠️ No se pudo marcar como impreso en backend, pero continuando...`);
+    }
+
+    // 4. Luego intentar imprimir (esto puede fallar)
+    let impresionRealizada = false;
+
     try {
-      // Intentar imprimir con la API
+      // Intentar con timeout para evitar bloqueos largos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_IMPRESORA_API}/api/imprimir`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(pedido),
+        signal: controller.signal
       });
 
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        // Fallback a impresión en ventana
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Impresión API exitosa:', result);
+        impresionRealizada = true;
+      } else {
+        throw new Error(`API impresión respondió con: ${response.status}`);
+      }
+
+    } catch (impresionError) {
+      console.log('⚠️ API de impresión no disponible, usando fallback...', impresionError);
+
+      // Fallback a impresión en ventana del navegador
+      try {
         const printWindow = window.open('', '_blank');
         if (printWindow) {
           printWindow.document.write(generarHTMLTicket());
           printWindow.document.close();
+          impresionRealizada = true;
+          console.log('✅ Impresión fallback exitosa');
         }
+      } catch (fallbackError) {
+        console.error('❌ Fallback también falló:', fallbackError);
       }
-
-      // Siempre marcar como impreso y notificar
-      await fetch('/api/pedidos', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: pedido.id, impreso: true })
-      });
-
-      setLocalImpreso(true);
-      onPedidoImpreso?.(pedido.id);
-
-    } catch (err) {
-      console.error('Error al imprimir:', err);
-      // Fallback a impresión en ventana
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(generarHTMLTicket());
-        printWindow.document.close();
-      }
-
-      // También marcar como impreso en caso de error
-      setLocalImpreso(true);
-      onPedidoImpreso?.(pedido.id);
-    } finally {
-      setIsPrinting(false);
     }
+
+    console.log(`🏁 Impresión finalizada para ${pedido.id}. Marcado: ${marcadoExitoso}, Impreso: ${impresionRealizada}`);
+    setIsPrinting(false);
   };
 
   return (
